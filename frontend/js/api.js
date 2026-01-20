@@ -3,11 +3,10 @@
  */
 
 const API = {
-    // 백엔드 서버 URL (배포 후 Railway URL로 변경 필요)
-    // 예: 'https://your-app.railway.app/api'
+    // 백엔드 서버 URL
     BASE_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
         ? 'http://localhost:3000/api'
-        : 'https://YOUR_RAILWAY_URL.railway.app/api',  // TODO: Railway 배포 후 실제 URL로 변경
+        : 'https://okfamily-production.up.railway.app/api',
 
     // JWT 토큰 저장 키
     TOKEN_KEY: 'auth_token',
