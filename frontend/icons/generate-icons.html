@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>아이콘 생성기</title>
+    <style>
+        body { font-family: sans-serif; padding: 40px; text-align: center; }
+        canvas { border: 1px solid #ccc; margin: 10px; }
+        button { padding: 12px 24px; font-size: 16px; margin: 20px 10px; cursor: pointer; }
+        .preview { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <h1>PWA 아이콘 생성</h1>
+    <p>아래 버튼을 클릭하면 PNG 아이콘이 다운로드됩니다.</p>
+
+    <div class="preview">
+        <div>
+            <canvas id="canvas192" width="192" height="192"></canvas>
+            <p>192x192</p>
+        </div>
+        <div>
+            <canvas id="canvas512" width="512" height="512"></canvas>
+            <p>512x512</p>
+        </div>
+    </div>
+
+    <button onclick="download(192)">icon-192.png 다운로드</button>
+    <button onclick="download(512)">icon-512.png 다운로드</button>
+
+    <script>
+        function drawIcon(ctx, size) {
+            const scale = size / 512;
+
+            // 배경 그라데이션
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#2563eb');
+            gradient.addColorStop(1, '#1d4ed8');
+
+            // 둥근 사각형 배경
+            const radius = 96 * scale;
+            ctx.beginPath();
+            ctx.roundRect(0, 0, size, size, radius);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // 자물쇠 몸체
+            ctx.fillStyle = 'white';
+            ctx.beginPath();
+            ctx.roundRect(156 * scale, 240 * scale, 200 * scale, 160 * scale, 24 * scale);
+            ctx.fill();
+
+            // 자물쇠 고리
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 36 * scale;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(196 * scale, 240 * scale);
+            ctx.lineTo(196 * scale, 180 * scale);
+            ctx.quadraticCurveTo(196 * scale, 100 * scale, 256 * scale, 100 * scale);
+            ctx.quadraticCurveTo(316 * scale, 100 * scale, 316 * scale, 180 * scale);
+            ctx.lineTo(316 * scale, 240 * scale);
+            ctx.stroke();
+
+            // 열쇠 구멍 (원)
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.arc(256 * scale, 310 * scale, 24 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 열쇠 구멍 (아래 부분)
+            ctx.beginPath();
+            ctx.roundRect(244 * scale, 310 * scale, 24 * scale, 50 * scale, 4 * scale);
+            ctx.fill();
+        }
+
+        // 캔버스에 미리보기 그리기
+        [192, 512].forEach(size => {
+            const canvas = document.getElementById('canvas' + size);
+            const ctx = canvas.getContext('2d');
+            drawIcon(ctx, size);
+        });
+
+        function download(size) {
+            const canvas = document.getElementById('canvas' + size);
+            const link = document.createElement('a');
+            link.download = 'icon-' + size + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+    </script>
+</body>
+</html>

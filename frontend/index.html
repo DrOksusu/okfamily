@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="description" content="안전한 비밀번호 관리 앱">
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
+
+    <title>비밀번호 관리</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 로그인 화면 -->
+        <section id="login-screen" class="screen active">
+            <div class="lock-container auth-container">
+                <div class="lock-icon">🔐</div>
+                <h1>비밀번호 관리</h1>
+                <p class="auth-subtitle">계정에 로그인하세요</p>
+
+                <form id="login-form">
+                    <div class="form-group">
+                        <input type="email" id="login-email" placeholder="이메일" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="login-password" placeholder="비밀번호" required autocomplete="current-password">
+                    </div>
+                    <button type="submit" class="btn-primary">로그인</button>
+                </form>
+
+                <div class="auth-divider">
+                    <span>또는</span>
+                </div>
+
+                <button id="show-register-btn" class="btn-secondary">회원가입</button>
+            </div>
+        </section>
+
+        <!-- 회원가입 화면 -->
+        <section id="register-screen" class="screen">
+            <div class="lock-container auth-container">
+                <div class="lock-icon">🔐</div>
+                <h1>회원가입</h1>
+                <p class="auth-subtitle">새 계정을 만드세요</p>
+
+                <form id="register-form">
+                    <div class="form-group">
+                        <input type="email" id="register-email" placeholder="이메일" required autocomplete="email">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="register-password" placeholder="비밀번호 (6자 이상)" required autocomplete="new-password" minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <input type="password" id="register-password-confirm" placeholder="비밀번호 확인" required autocomplete="new-password">
+                    </div>
+                    <button type="submit" class="btn-primary">가입하기</button>
+                </form>
+
+                <button id="show-login-btn" class="btn-link">이미 계정이 있으신가요? 로그인</button>
+            </div>
+        </section>
+
+        <!-- 마스터 비밀번호 화면 -->
+        <section id="lock-screen" class="screen">
+            <div class="lock-container">
+                <div class="lock-icon">🔐</div>
+                <h1>비밀번호 관리</h1>
+                <p id="lock-message">마스터 비밀번호를 입력하세요</p>
+                <input type="password" id="master-password" placeholder="마스터 비밀번호" autocomplete="off">
+                <button id="unlock-btn" class="btn-primary">잠금 해제</button>
+                <div class="lock-actions">
+                    <button id="logout-btn" class="btn-link">로그아웃</button>
+                    <button id="reset-btn" class="btn-link">데이터 초기화</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 메인 목록 화면 -->
+        <section id="main-screen" class="screen">
+            <header>
+                <h1>내 비밀번호</h1>
+                <div class="header-actions">
+                    <button id="settings-btn" class="icon-btn" title="설정">⚙️</button>
+                    <button id="lock-btn" class="icon-btn" title="잠금">🔒</button>
+                </div>
+            </header>
+
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="검색...">
+            </div>
+
+            <ul id="password-list" class="password-list">
+                <!-- 비밀번호 항목들이 여기에 표시됨 -->
+            </ul>
+
+            <button id="add-btn" class="fab">+</button>
+        </section>
+
+        <!-- 추가/편집 화면 -->
+        <section id="edit-screen" class="screen">
+            <header>
+                <button id="back-btn" class="icon-btn">←</button>
+                <h1 id="edit-title">새 비밀번호</h1>
+                <button id="delete-btn" class="icon-btn" style="display:none;">🗑️</button>
+            </header>
+
+            <form id="password-form">
+                <div class="form-group">
+                    <label for="site-name">사이트/앱 이름</label>
+                    <input type="text" id="site-name" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="username">아이디</label>
+                    <input type="text" id="username" autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">비밀번호</label>
+                    <div class="password-input-group">
+                        <input type="password" id="password" required>
+                        <button type="button" id="toggle-password" class="icon-btn">👁️</button>
+                        <button type="button" id="generate-password" class="icon-btn">🎲</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="notes">메모</label>
+                    <textarea id="notes" rows="3"></textarea>
+                </div>
+
+                <button type="submit" class="btn-primary">저장</button>
+            </form>
+        </section>
+
+        <!-- 설정 화면 -->
+        <section id="settings-screen" class="screen">
+            <header>
+                <button id="settings-back-btn" class="icon-btn">←</button>
+                <h1>설정</h1>
+            </header>
+
+            <div class="settings-list">
+                <div class="settings-item">
+                    <span>자동 잠금 시간</span>
+                    <select id="auto-lock-time">
+                        <option value="60000">1분</option>
+                        <option value="300000" selected>5분</option>
+                        <option value="600000">10분</option>
+                    </select>
+                </div>
+
+                <button id="export-btn" class="btn-secondary">백업 파일 내보내기</button>
+                <button id="import-btn" class="btn-secondary">백업 파일 가져오기</button>
+                <input type="file" id="import-file" accept=".json" style="display:none;">
+
+                <button id="change-master-btn" class="btn-secondary">마스터 비밀번호 변경</button>
+
+                <div class="settings-divider"></div>
+
+                <button id="settings-logout-btn" class="btn-danger">로그아웃</button>
+            </div>
+        </section>
+    </div>
+
+    <!-- 로딩 오버레이 -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- 토스트 메시지 -->
+    <div id="toast" class="toast"></div>
+
+    <script src="js/crypto.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
