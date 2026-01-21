@@ -40,7 +40,11 @@ const authLimiter = rateLimit({
 // Body parser
 app.use(express.json({ limit: '10mb' }));
 
-// Health check
+// Health check (root path for Railway healthcheck)
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', service: 'Password Manager API' });
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -70,11 +74,9 @@ async function startServer() {
         await sequelize.authenticate();
         console.log('Database connected successfully.');
 
-        // Sync models (in development only)
-        if (process.env.NODE_ENV === 'development') {
-            await sequelize.sync({ alter: true });
-            console.log('Database synced.');
-        }
+        // Sync models (create tables if not exist)
+        await sequelize.sync();
+        console.log('Database synced.');
 
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
