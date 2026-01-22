@@ -42,6 +42,7 @@ router.put('/', async (req, res) => {
 
         if (vault) {
             // Update existing vault
+            vault.masterHash = masterHash;
             vault.encryptedData = encryptedData;
             await vault.save();
         } else {

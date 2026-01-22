@@ -451,3 +451,103 @@ input:focus, textarea:focus {
     opacity: 0.6;
     cursor: not-allowed;
 }
+
+/* 생체인증 버튼 */
+.btn-biometric {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-biometric:hover {
+    background: var(--primary);
+    color: white;
+}
+
+.btn-biometric:active {
+    transform: scale(0.98);
+}
+
+.biometric-icon {
+    font-size: 1.25rem;
+}
+
+/* 또는 구분선 (잠금화면용) */
+.lock-divider {
+    display: flex;
+    align-items: center;
+    margin: 16px 0;
+}
+
+.lock-divider::before,
+.lock-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+}
+
+.lock-divider span {
+    padding: 0 12px;
+    color: var(--gray-500);
+    font-size: 0.75rem;
+}
+
+/* 토글 스위치 */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 28px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--gray-200);
+    transition: 0.3s;
+    border-radius: 28px;
+}
+
+.toggle-slider::before {
+    position: absolute;
+    content: "";
+    height: 22px;
+    width: 22px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--primary);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(22px);
+}

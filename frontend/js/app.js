@@ -36,11 +36,29 @@ const App = {
                 this.elements.autoLockTime.value = savedAutoLockTime;
             }
 
+            // 생체인증 지원 여부 확인 및 UI 업데이트
+            await this.initBiometric();
+
             // 인증 상태 확인
             await this.checkAuth();
         } catch (error) {
             console.error('앱 초기화 오류:', error);
             this.showToast('앱 초기화 오류: ' + error.message);
+        }
+    },
+
+    /**
+     * 생체인증 초기화
+     */
+    async initBiometric() {
+        const isSupported = await Biometric.isSupported();
+
+        if (isSupported) {
+            // 설정 화면에 생체인증 옵션 표시
+            this.elements.biometricSettings.style.display = 'flex';
+
+            // 토글 상태 설정
+            this.elements.biometricToggle.checked = Biometric.isEnabled();
         }
     },
 
@@ -63,9 +81,17 @@ const App = {
                 this.vaultMasterHash = vault.masterHash;
                 this.elements.lockMessage.textContent = '마스터 비밀번호를 입력하세요';
                 this.elements.unlockBtn.textContent = '잠금 해제';
+
+                // 생체인증 버튼 표시 여부
+                if (Biometric.isEnabled()) {
+                    this.elements.biometricBtn.style.display = 'flex';
+                } else {
+                    this.elements.biometricBtn.style.display = 'none';
+                }
             } else {
                 this.elements.lockMessage.textContent = '새 마스터 비밀번호를 설정하세요';
                 this.elements.unlockBtn.textContent = '설정하기';
+                this.elements.biometricBtn.style.display = 'none';
             }
 
             this.showScreen('lock');
@@ -119,6 +145,7 @@ const App = {
             // 잠금 화면
             masterPassword: document.getElementById('master-password'),
             unlockBtn: document.getElementById('unlock-btn'),
+            biometricBtn: document.getElementById('biometric-btn'),
             resetBtn: document.getElementById('reset-btn'),
             logoutBtn: document.getElementById('logout-btn'),
             lockMessage: document.getElementById('lock-message'),
@@ -145,6 +172,8 @@ const App = {
             // 설정 화면
             settingsBackBtn: document.getElementById('settings-back-btn'),
             autoLockTime: document.getElementById('auto-lock-time'),
+            biometricSettings: document.getElementById('biometric-settings'),
+            biometricToggle: document.getElementById('biometric-toggle'),
             exportBtn: document.getElementById('export-btn'),
             importBtn: document.getElementById('import-btn'),
             importFile: document.getElementById('import-file'),
@@ -174,6 +203,7 @@ const App = {
         this.elements.masterPassword.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.handleUnlock();
         });
+        this.elements.biometricBtn.addEventListener('click', () => this.handleBiometricUnlock());
         this.elements.resetBtn.addEventListener('click', () => this.handleReset());
         this.elements.logoutBtn.addEventListener('click', () => this.handleLogout());
 
@@ -193,6 +223,7 @@ const App = {
         // 설정 화면
         this.elements.settingsBackBtn.addEventListener('click', () => this.showScreen('main'));
         this.elements.autoLockTime.addEventListener('change', (e) => this.handleAutoLockTimeChange(e));
+        this.elements.biometricToggle.addEventListener('change', (e) => this.handleBiometricToggle(e));
         this.elements.exportBtn.addEventListener('click', () => this.handleExport());
         this.elements.importBtn.addEventListener('click', () => this.elements.importFile.click());
         this.elements.importFile.addEventListener('change', (e) => this.handleImport(e));
@@ -341,6 +372,68 @@ const App = {
     },
 
     /**
+     * 생체인증으로 잠금 해제
+     */
+    async handleBiometricUnlock() {
+        try {
+            this.showLoading(true);
+
+            // 생체인증으로 마스터 비밀번호 가져오기
+            const password = await Biometric.authenticate();
+
+            // 비밀번호 검증
+            const isValid = await Crypto.verifyPassword(password, this.vaultMasterHash);
+
+            if (!isValid) {
+                this.showToast('생체인증 데이터가 유효하지 않습니다. 비밀번호로 로그인하세요.');
+                Biometric.disable();
+                this.elements.biometricBtn.style.display = 'none';
+                return;
+            }
+
+            this.masterPassword = password;
+            await this.loadPasswords();
+
+            this.showScreen('main');
+            this.renderPasswordList();
+            this.resetAutoLock();
+        } catch (error) {
+            console.error('생체인증 오류:', error);
+            this.showToast(error.message || '생체인증 실패');
+        } finally {
+            this.showLoading(false);
+        }
+    },
+
+    /**
+     * 생체인증 설정 토글
+     */
+    async handleBiometricToggle(e) {
+        const enabled = e.target.checked;
+
+        if (enabled) {
+            // 생체인증 활성화 - 마스터 비밀번호 필요
+            if (!this.masterPassword) {
+                this.showToast('먼저 마스터 비밀번호로 잠금을 해제하세요');
+                e.target.checked = false;
+                return;
+            }
+
+            try {
+                await Biometric.register(this.masterPassword);
+                this.showToast('지문 인증이 활성화되었습니다');
+            } catch (error) {
+                this.showToast(error.message);
+                e.target.checked = false;
+            }
+        } else {
+            // 생체인증 비활성화
+            Biometric.disable();
+            this.showToast('지문 인증이 비활성화되었습니다');
+        }
+    },
+
+    /**
      * 잠금
      */
     lock() {
@@ -350,6 +443,11 @@ const App = {
         this.showScreen('lock');
         this.elements.unlockBtn.textContent = '잠금 해제';
         this.elements.lockMessage.textContent = '마스터 비밀번호를 입력하세요';
+
+        // 생체인증 버튼 표시 여부
+        if (Biometric.isEnabled()) {
+            this.elements.biometricBtn.style.display = 'flex';
+        }
     },
 
     /**
@@ -622,6 +720,11 @@ const App = {
 
             this.vaultMasterHash = hash;
             this.masterPassword = newPassword;
+
+            // 생체인증이 활성화된 경우 업데이트
+            if (Biometric.isEnabled()) {
+                await Biometric.updateMaster(newPassword);
+            }
 
             this.showToast('마스터 비밀번호가 변경되었습니다');
         } catch (error) {
