@@ -42,7 +42,10 @@ const Biometric = {
         }
 
         try {
-            // 마스터 비밀번호를 암호화하여 저장
+            // 먼저 생체인증으로 본인 확인 (지문 등록)
+            await this.createCredential();
+
+            // 인증 성공 후 마스터 비밀번호를 암호화하여 저장
             const encryptedMaster = await this.encryptMaster(masterPassword);
             localStorage.setItem(this.MASTER_KEY, encryptedMaster);
             localStorage.setItem(this.CREDENTIAL_KEY, 'true');
@@ -50,8 +53,54 @@ const Biometric = {
             return true;
         } catch (error) {
             console.error('생체인증 등록 실패:', error);
+            if (error.name === 'NotAllowedError') {
+                throw new Error('생체인증이 취소되었습니다.');
+            }
             throw new Error('생체인증 등록에 실패했습니다.');
         }
+    },
+
+    /**
+     * 생체인증 Credential 생성 (지문 등록)
+     */
+    async createCredential() {
+        const challenge = crypto.getRandomValues(new Uint8Array(32));
+        const userId = crypto.getRandomValues(new Uint8Array(16));
+
+        const createOptions = {
+            publicKey: {
+                challenge: challenge,
+                rp: {
+                    name: '비밀번호 관리',
+                    id: this.getRpId()
+                },
+                user: {
+                    id: userId,
+                    name: 'user@passwordmanager',
+                    displayName: '사용자'
+                },
+                pubKeyCredParams: [
+                    { type: 'public-key', alg: -7 },   // ES256
+                    { type: 'public-key', alg: -257 }  // RS256
+                ],
+                authenticatorSelection: {
+                    authenticatorAttachment: 'platform',  // 기기 내장 인증 (지문, Face ID)
+                    userVerification: 'required',         // 생체인증 필수
+                    residentKey: 'discouraged'
+                },
+                timeout: 60000,
+                attestation: 'none'
+            }
+        };
+
+        // 지문/Face ID 등록 요청
+        const credential = await navigator.credentials.create(createOptions);
+
+        // Credential ID 저장 (나중에 인증 시 사용)
+        const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+        localStorage.setItem('credential_id', credentialId);
+
+        return credential;
     },
 
     /**
@@ -63,13 +112,22 @@ const Biometric = {
         }
 
         try {
-            // 생체인증 요청
+            // 저장된 credential ID 가져오기
+            const credentialIdBase64 = localStorage.getItem('credential_id');
+            const allowCredentials = credentialIdBase64 ? [{
+                type: 'public-key',
+                id: new Uint8Array(atob(credentialIdBase64).split('').map(c => c.charCodeAt(0))),
+                transports: ['internal']
+            }] : [];
+
+            // 생체인증 요청 (지문/Face ID)
             const credential = await navigator.credentials.get({
                 publicKey: {
                     challenge: crypto.getRandomValues(new Uint8Array(32)),
                     timeout: 60000,
                     userVerification: 'required',
-                    rpId: window.location.hostname === 'localhost' ? 'localhost' : window.location.hostname
+                    rpId: this.getRpId(),
+                    allowCredentials: allowCredentials
                 }
             });
 
@@ -85,96 +143,8 @@ const Biometric = {
             if (error.name === 'NotAllowedError') {
                 throw new Error('생체인증이 취소되었습니다.');
             }
-            // Credential이 없는 경우 - 간단한 생체인증 사용
-            if (error.name === 'InvalidStateError' || !await this.hasCredential()) {
-                return await this.authenticateSimple();
-            }
-            throw error;
-        }
-    },
-
-    /**
-     * 간단한 생체인증 (WebAuthn 없이)
-     * - 일부 기기에서 WebAuthn이 완전히 지원되지 않을 때 사용
-     */
-    async authenticateSimple() {
-        try {
-            // CredentialLess 생체인증 시도
-            const result = await this.requestBiometricAuth();
-
-            if (result) {
-                const encryptedMaster = localStorage.getItem(this.MASTER_KEY);
-                if (!encryptedMaster) {
-                    throw new Error('저장된 마스터 비밀번호가 없습니다.');
-                }
-                return await this.decryptMaster(encryptedMaster);
-            }
-
-            throw new Error('생체인증 실패');
-        } catch (error) {
-            if (error.name === 'NotAllowedError') {
-                throw new Error('생체인증이 취소되었습니다.');
-            }
-            throw error;
-        }
-    },
-
-    /**
-     * 생체인증 요청 (PublicKeyCredential 생성 방식)
-     */
-    async requestBiometricAuth() {
-        const challenge = crypto.getRandomValues(new Uint8Array(32));
-        const userId = crypto.getRandomValues(new Uint8Array(16));
-
-        try {
-            // 먼저 기존 credential로 인증 시도
-            const getOptions = {
-                publicKey: {
-                    challenge: challenge,
-                    timeout: 60000,
-                    userVerification: 'required',
-                    rpId: this.getRpId()
-                }
-            };
-
-            await navigator.credentials.get(getOptions);
-            return true;
-        } catch (getError) {
-            // credential이 없으면 새로 생성하면서 인증
-            try {
-                const createOptions = {
-                    publicKey: {
-                        challenge: challenge,
-                        rp: {
-                            name: '비밀번호 관리',
-                            id: this.getRpId()
-                        },
-                        user: {
-                            id: userId,
-                            name: 'user@passwordmanager',
-                            displayName: '사용자'
-                        },
-                        pubKeyCredParams: [
-                            { type: 'public-key', alg: -7 },  // ES256
-                            { type: 'public-key', alg: -257 } // RS256
-                        ],
-                        authenticatorSelection: {
-                            authenticatorAttachment: 'platform',
-                            userVerification: 'required'
-                        },
-                        timeout: 60000
-                    }
-                };
-
-                await navigator.credentials.create(createOptions);
-                return true;
-            } catch (createError) {
-                if (createError.name === 'NotAllowedError') {
-                    throw createError;
-                }
-                console.error('Credential 생성 실패:', createError);
-                throw new Error('생체인증을 사용할 수 없습니다.');
-            }
+            console.error('생체인증 오류:', error);
+            throw new Error('생체인증에 실패했습니다. 비밀번호로 로그인하세요.');
         }
     },
 
@@ -192,26 +162,6 @@ const Biometric = {
             return 'localhost';
         }
         return hostname;
-    },
-
-    /**
-     * Credential 존재 여부 확인
-     */
-    async hasCredential() {
-        try {
-            const credentials = await navigator.credentials.get({
-                publicKey: {
-                    challenge: crypto.getRandomValues(new Uint8Array(32)),
-                    timeout: 1000,
-                    userVerification: 'discouraged',
-                    rpId: this.getRpId()
-                },
-                mediation: 'silent'
-            });
-            return !!credentials;
-        } catch {
-            return false;
-        }
     },
 
     /**
@@ -307,6 +257,7 @@ const Biometric = {
     disable() {
         localStorage.removeItem(this.CREDENTIAL_KEY);
         localStorage.removeItem(this.MASTER_KEY);
+        localStorage.removeItem('credential_id');
     },
 
     /**
