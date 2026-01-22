@@ -108,6 +108,44 @@
             <button id="add-btn" class="fab">+</button>
         </section>
 
+        <!-- 상세 보기 화면 -->
+        <section id="detail-screen" class="screen">
+            <header>
+                <button id="detail-back-btn" class="icon-btn">←</button>
+                <h1 id="detail-title">비밀번호 정보</h1>
+                <button id="edit-btn" class="icon-btn">✏️</button>
+            </header>
+
+            <div class="detail-container">
+                <div class="detail-icon" id="detail-icon">G</div>
+                <h2 id="detail-site-name" class="detail-site-name">사이트명</h2>
+
+                <div class="detail-field">
+                    <label>아이디</label>
+                    <div class="detail-value-row">
+                        <span id="detail-username" class="detail-value">username</span>
+                        <button id="copy-username-btn" class="copy-btn" title="복사">📋</button>
+                    </div>
+                </div>
+
+                <div class="detail-field">
+                    <label>비밀번호</label>
+                    <div class="detail-value-row">
+                        <span id="detail-password" class="detail-value password-hidden">••••••••</span>
+                        <button id="toggle-detail-password" class="copy-btn" title="보기">👁️</button>
+                        <button id="copy-password-btn" class="copy-btn" title="복사">📋</button>
+                    </div>
+                </div>
+
+                <div class="detail-field" id="detail-notes-container">
+                    <label>메모</label>
+                    <p id="detail-notes" class="detail-notes">메모 내용</p>
+                </div>
+
+                <button id="detail-delete-btn" class="btn-danger">삭제</button>
+            </div>
+        </section>
+
         <!-- 추가/편집 화면 -->
         <section id="edit-screen" class="screen">
             <header>

@@ -551,3 +551,93 @@ input:focus, textarea:focus {
 .toggle-switch input:checked + .toggle-slider::before {
     transform: translateX(22px);
 }
+
+/* 상세 보기 화면 */
+.detail-container {
+    padding: 16px 0;
+    text-align: center;
+}
+
+.detail-icon {
+    width: 80px;
+    height: 80px;
+    background: var(--primary);
+    color: white;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 auto 16px;
+}
+
+.detail-site-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 24px;
+    color: var(--gray-900);
+}
+
+.detail-field {
+    text-align: left;
+    background: var(--gray-100);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.detail-field label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--gray-500);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-value-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.detail-value {
+    flex: 1;
+    font-size: 1rem;
+    color: var(--gray-900);
+    word-break: break-all;
+}
+
+.detail-value.password-hidden {
+    letter-spacing: 2px;
+}
+
+.copy-btn {
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.copy-btn:hover {
+    background: var(--gray-200);
+}
+
+.copy-btn:active {
+    transform: scale(0.95);
+}
+
+.detail-notes {
+    font-size: 1rem;
+    color: var(--gray-700);
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+#detail-screen .btn-danger {
+    margin-top: 24px;
+}

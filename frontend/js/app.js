@@ -124,6 +124,7 @@ const App = {
             register: document.getElementById('register-screen'),
             lock: document.getElementById('lock-screen'),
             main: document.getElementById('main-screen'),
+            detail: document.getElementById('detail-screen'),
             edit: document.getElementById('edit-screen'),
             settings: document.getElementById('settings-screen')
         };
@@ -156,6 +157,21 @@ const App = {
             searchInput: document.getElementById('search-input'),
             passwordList: document.getElementById('password-list'),
             addBtn: document.getElementById('add-btn'),
+
+            // 상세 보기 화면
+            detailBackBtn: document.getElementById('detail-back-btn'),
+            detailTitle: document.getElementById('detail-title'),
+            editBtn: document.getElementById('edit-btn'),
+            detailIcon: document.getElementById('detail-icon'),
+            detailSiteName: document.getElementById('detail-site-name'),
+            detailUsername: document.getElementById('detail-username'),
+            detailPassword: document.getElementById('detail-password'),
+            detailNotes: document.getElementById('detail-notes'),
+            detailNotesContainer: document.getElementById('detail-notes-container'),
+            copyUsernameBtn: document.getElementById('copy-username-btn'),
+            copyPasswordBtn: document.getElementById('copy-password-btn'),
+            toggleDetailPassword: document.getElementById('toggle-detail-password'),
+            detailDeleteBtn: document.getElementById('detail-delete-btn'),
 
             // 편집 화면
             backBtn: document.getElementById('back-btn'),
@@ -212,6 +228,14 @@ const App = {
         this.elements.settingsBtn.addEventListener('click', () => this.showScreen('settings'));
         this.elements.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
         this.elements.addBtn.addEventListener('click', () => this.showEditScreen());
+
+        // 상세 보기 화면
+        this.elements.detailBackBtn.addEventListener('click', () => this.showScreen('main'));
+        this.elements.editBtn.addEventListener('click', () => this.showEditScreen(this.currentEditId));
+        this.elements.copyUsernameBtn.addEventListener('click', () => this.copyToClipboard('username'));
+        this.elements.copyPasswordBtn.addEventListener('click', () => this.copyToClipboard('password'));
+        this.elements.toggleDetailPassword.addEventListener('click', () => this.toggleDetailPasswordVisibility());
+        this.elements.detailDeleteBtn.addEventListener('click', () => this.handleDelete());
 
         // 편집 화면
         this.elements.backBtn.addEventListener('click', () => this.showScreen('main'));
@@ -503,7 +527,7 @@ const App = {
 
         // 클릭 이벤트 추가
         this.elements.passwordList.querySelectorAll('.password-item').forEach(item => {
-            item.addEventListener('click', () => this.showEditScreen(item.dataset.id));
+            item.addEventListener('click', () => this.showDetailScreen(item.dataset.id));
         });
     },
 
@@ -512,6 +536,86 @@ const App = {
      */
     handleSearch(query) {
         this.renderPasswordList(query);
+    },
+
+    /**
+     * 상세 보기 화면 표시
+     */
+    showDetailScreen(id) {
+        const password = this.passwords.find(p => p.id === id);
+        if (!password) return;
+
+        this.currentEditId = id;
+        this.currentDetailPassword = password.password; // 복사용 저장
+
+        // 정보 표시
+        this.elements.detailIcon.textContent = password.siteName.charAt(0).toUpperCase();
+        this.elements.detailSiteName.textContent = password.siteName;
+        this.elements.detailUsername.textContent = password.username || '(없음)';
+        this.elements.detailPassword.textContent = '••••••••';
+        this.elements.detailPassword.classList.add('password-hidden');
+        this.detailPasswordVisible = false;
+
+        // 메모 표시
+        if (password.notes) {
+            this.elements.detailNotes.textContent = password.notes;
+            this.elements.detailNotesContainer.style.display = 'block';
+        } else {
+            this.elements.detailNotesContainer.style.display = 'none';
+        }
+
+        this.showScreen('detail');
+    },
+
+    /**
+     * 상세 화면 비밀번호 표시/숨김 토글
+     */
+    toggleDetailPasswordVisibility() {
+        const password = this.passwords.find(p => p.id === this.currentEditId);
+        if (!password) return;
+
+        this.detailPasswordVisible = !this.detailPasswordVisible;
+
+        if (this.detailPasswordVisible) {
+            this.elements.detailPassword.textContent = password.password;
+            this.elements.detailPassword.classList.remove('password-hidden');
+        } else {
+            this.elements.detailPassword.textContent = '••••••••';
+            this.elements.detailPassword.classList.add('password-hidden');
+        }
+    },
+
+    /**
+     * 클립보드에 복사
+     */
+    async copyToClipboard(type) {
+        const password = this.passwords.find(p => p.id === this.currentEditId);
+        if (!password) return;
+
+        let text = '';
+        let message = '';
+
+        if (type === 'username') {
+            text = password.username || '';
+            message = '아이디가 복사되었습니다';
+        } else if (type === 'password') {
+            text = password.password;
+            message = '비밀번호가 복사되었습니다';
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            this.showToast(message);
+        } catch (error) {
+            // 폴백: 구형 방식
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            this.showToast(message);
+        }
     },
 
     /**
