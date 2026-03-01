@@ -20,3 +20,15 @@ Thumbs.db
 
 # Claude
 .claude/
+
+# bkit 플러그인 캐시
+.bkit/
+
+# 로컬 MCP 설정
+.mcp.json
+
+# 테스트 스크린샷
+test/screenshots/
+
+# bkit PDCA 문서 (로컬 전용)
+docs/
