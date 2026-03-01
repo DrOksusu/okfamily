@@ -67,7 +67,7 @@ jobs:
             docker run -d \
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
-              -p 3000:3000 \
+              -p 3001:3000 \
               -e NODE_ENV=production \
               -e PORT=3000 \
               -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
@@ -81,7 +81,7 @@ jobs:
 
             # Health check
             sleep 10
-            curl -f http://localhost:3000/health || exit 1
+            curl -f http://localhost:3001/health || exit 1
 
       - name: Deployment Status
         if: success()
