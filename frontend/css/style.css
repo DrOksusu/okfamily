@@ -5,29 +5,41 @@
 }
 
 :root {
-    --primary: #2563eb;
-    --primary-dark: #1d4ed8;
+    /* 따뜻한 골든아워 테마 색상 */
+    --primary: #d97706;
+    --primary-dark: #b45309;
+    --primary-light: #fbbf24;
     --danger: #dc2626;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-500: #6b7280;
-    --gray-700: #374151;
-    --gray-900: #111827;
+
+    /* 따뜻한 그레이 톤 */
+    --gray-100: #fdf8f0;
+    --gray-200: #e8e0d4;
+    --gray-500: #8b7e6a;
+    --gray-700: #4a3f30;
+    --gray-900: #2c1f0e;
+
+    /* 따뜻한 배경/텍스트 */
+    --warm-bg: #fffbeb;
+    --warm-card: #fef9ee;
+    --warm-overlay: rgba(44, 31, 14, 0.45);
+    --warm-glass: rgba(255, 251, 235, 0.85);
+    --warm-shadow: rgba(180, 83, 9, 0.15);
 }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: var(--gray-100);
+    background: var(--warm-bg);
     color: var(--gray-900);
     min-height: 100vh;
     -webkit-tap-highlight-color: transparent;
+    line-height: 1.6;
 }
 
 #app {
     max-width: 480px;
     margin: 0 auto;
     min-height: 100vh;
-    background: white;
+    background: var(--warm-card);
 }
 
 /* 화면 전환 */
@@ -52,13 +64,26 @@ header {
 header h1 {
     font-size: 1.5rem;
     font-weight: 700;
+    color: var(--gray-900);
 }
 
-/* 잠금 화면 */
+/* 잠금 화면 — 가족 사진 배경 */
 #lock-screen {
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    background: url('../okfamily.jpg') center/cover no-repeat fixed;
+    position: relative;
+}
+
+#lock-screen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--warm-overlay);
+    z-index: 0;
 }
 
 #lock-screen.active {
@@ -68,21 +93,28 @@ header h1 {
 .lock-container {
     text-align: center;
     padding: 32px;
-    background: white;
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+    background: var(--warm-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2),
+                0 0 0 1px rgba(255, 255, 255, 0.15);
     width: 100%;
     max-width: 320px;
+    position: relative;
+    z-index: 1;
 }
 
 .lock-icon {
     font-size: 48px;
     margin-bottom: 16px;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
 .lock-container h1 {
     font-size: 1.25rem;
     margin-bottom: 8px;
+    color: var(--gray-900);
 }
 
 .lock-container p {
@@ -95,18 +127,21 @@ header h1 {
 .btn-primary {
     width: 100%;
     padding: 14px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 12px var(--warm-shadow);
 }
 
 .btn-primary:hover {
-    background: var(--primary-dark);
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #92400e 100%);
+    box-shadow: 0 6px 16px var(--warm-shadow);
+    transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -114,12 +149,17 @@ header h1 {
     padding: 14px;
     background: var(--gray-100);
     color: var(--gray-700);
-    border: none;
-    border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
     margin-top: 12px;
+    transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+    background: var(--gray-200);
 }
 
 .icon-btn {
@@ -129,6 +169,7 @@ header h1 {
     cursor: pointer;
     padding: 8px;
     border-radius: 8px;
+    transition: background 0.2s;
 }
 
 .icon-btn:hover {
@@ -140,14 +181,17 @@ input, textarea, select {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--gray-200);
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     outline: none;
-    transition: border-color 0.2s;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: white;
+    color: var(--gray-900);
 }
 
-input:focus, textarea:focus {
+input:focus, textarea:focus, select:focus {
     border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
 }
 
 /* 검색바 */
@@ -157,7 +201,11 @@ input:focus, textarea:focus {
 
 .search-bar input {
     background: var(--gray-100);
-    border: none;
+    border: 1px solid var(--gray-200);
+}
+
+.search-bar input:focus {
+    background: white;
 }
 
 /* 비밀번호 목록 */
@@ -169,11 +217,17 @@ input:focus, textarea:focus {
     display: flex;
     align-items: center;
     padding: 16px;
-    background: var(--gray-100);
-    border-radius: 12px;
-    margin-bottom: 8px;
+    background: white;
+    border-radius: 14px;
+    margin-bottom: 10px;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(180, 83, 9, 0.06);
+    border: 1px solid rgba(232, 224, 212, 0.5);
+}
+
+.password-item:hover {
+    box-shadow: 0 4px 16px rgba(180, 83, 9, 0.12);
 }
 
 .password-item:active {
@@ -183,7 +237,7 @@ input:focus, textarea:focus {
 .password-item-icon {
     width: 40px;
     height: 40px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border-radius: 10px;
     display: flex;
@@ -191,6 +245,7 @@ input:focus, textarea:focus {
     justify-content: center;
     font-weight: 700;
     margin-right: 12px;
+    box-shadow: 0 2px 6px var(--warm-shadow);
 }
 
 .password-item-info {
@@ -200,6 +255,7 @@ input:focus, textarea:focus {
 .password-item-name {
     font-weight: 600;
     margin-bottom: 2px;
+    color: var(--gray-900);
 }
 
 .password-item-username {
@@ -214,18 +270,19 @@ input:focus, textarea:focus {
     right: 24px;
     width: 56px;
     height: 56px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border: none;
     border-radius: 50%;
     font-size: 28px;
     cursor: pointer;
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-    transition: transform 0.2s;
+    box-shadow: 0 6px 20px rgba(217, 119, 6, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .fab:hover {
-    transform: scale(1.05);
+    transform: scale(1.08);
+    box-shadow: 0 8px 24px rgba(217, 119, 6, 0.5);
 }
 
 /* 폼 */
@@ -282,11 +339,12 @@ input:focus, textarea:focus {
     background: var(--gray-900);
     color: white;
     padding: 12px 24px;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 0.875rem;
     opacity: 0;
     transition: opacity 0.3s;
     pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .toast.show {
@@ -305,12 +363,25 @@ input:focus, textarea:focus {
     margin-bottom: 16px;
 }
 
-/* 로그인/회원가입 화면 */
+/* 로그인/회원가입 화면 — 가족 사진 배경 */
 #login-screen,
 #register-screen {
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    background: url('../okfamily.jpg') center/cover no-repeat fixed;
+    position: relative;
+}
+
+#login-screen::before,
+#register-screen::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--warm-overlay);
+    z-index: 0;
 }
 
 #login-screen.active,
@@ -320,6 +391,8 @@ input:focus, textarea:focus {
 
 .auth-container {
     max-width: 360px;
+    position: relative;
+    z-index: 1;
 }
 
 .auth-container .form-group {
@@ -328,7 +401,9 @@ input:focus, textarea:focus {
 }
 
 .auth-container .form-group input {
-    background: var(--gray-100);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
 }
 
 .auth-subtitle {
@@ -366,10 +441,12 @@ input:focus, textarea:focus {
     cursor: pointer;
     padding: 8px;
     margin-top: 16px;
+    transition: color 0.2s;
 }
 
 .btn-link:hover {
     text-decoration: underline;
+    color: var(--primary-dark);
 }
 
 /* 위험 버튼 */
@@ -379,11 +456,12 @@ input:focus, textarea:focus {
     background: var(--danger);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
     margin-top: 12px;
+    transition: background 0.2s;
 }
 
 .btn-danger:hover {
@@ -424,7 +502,7 @@ input:focus, textarea:focus {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 251, 235, 0.92);
     display: none;
     align-items: center;
     justify-content: center;
@@ -464,7 +542,7 @@ input:focus, textarea:focus {
     background: transparent;
     color: var(--primary);
     border: 2px solid var(--primary);
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
     font-weight: 500;
     cursor: pointer;
@@ -566,7 +644,7 @@ input:focus, textarea:focus {
 .detail-icon {
     width: 80px;
     height: 80px;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border-radius: 20px;
     display: flex;
@@ -575,6 +653,7 @@ input:focus, textarea:focus {
     font-size: 2rem;
     font-weight: 700;
     margin: 0 auto 16px;
+    box-shadow: 0 4px 16px var(--warm-shadow);
 }
 
 .detail-site-name {
@@ -586,10 +665,12 @@ input:focus, textarea:focus {
 
 .detail-field {
     text-align: left;
-    background: var(--gray-100);
-    border-radius: 12px;
+    background: white;
+    border-radius: 14px;
     padding: 16px;
     margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(180, 83, 9, 0.06);
+    border: 1px solid rgba(232, 224, 212, 0.5);
 }
 
 .detail-field label {
@@ -674,13 +755,15 @@ input:focus, textarea:focus {
 }
 
 .category-chip.active {
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
     border-color: var(--primary);
+    box-shadow: 0 2px 8px var(--warm-shadow);
 }
 
 .category-chip:hover:not(.active) {
     background: var(--gray-100);
+    border-color: var(--primary-light);
 }
 
 /* 카테고리 뱃지 */
