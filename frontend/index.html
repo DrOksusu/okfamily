@@ -125,6 +125,7 @@
                 <!-- 비밀번호 항목들이 여기에 표시됨 -->
             </ul>
 
+            <button id="paste-btn" class="fab fab-secondary" title="붙여넣기로 추가">📋</button>
             <button id="add-btn" class="fab">+</button>
         </section>
 
@@ -261,12 +262,26 @@
         <div class="loading-spinner"></div>
     </div>
 
+    <!-- 붙여넣기 모달 -->
+    <div id="paste-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>붙여넣기로 추가</h2>
+                <button id="paste-modal-close" class="icon-btn">✕</button>
+            </div>
+            <p class="modal-desc">사이트, 아이디, 비밀번호 등을 자유롭게 붙여넣으세요. 자동으로 분류합니다.</p>
+            <textarea id="paste-input" class="paste-textarea" rows="8" placeholder="예시:&#10;신한은행 인터넷뱅킹&#10;아이디: mybank123&#10;비번: s3cret!@#&#10;https://banking.shinhan.com"></textarea>
+            <button id="paste-analyze-btn" class="btn-primary">분석하기</button>
+        </div>
+    </div>
+
     <!-- 토스트 메시지 -->
     <div id="toast" class="toast"></div>
 
     <script src="js/crypto.js"></script>
     <script src="js/api.js"></script>
     <script src="js/biometric.js"></script>
+    <script src="js/paste-parser.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

@@ -209,6 +209,13 @@ const App = {
             changeMasterBtn: document.getElementById('change-master-btn'),
             settingsLogoutBtn: document.getElementById('settings-logout-btn'),
 
+            // 붙여넣기 모달
+            pasteBtn: document.getElementById('paste-btn'),
+            pasteModal: document.getElementById('paste-modal'),
+            pasteModalClose: document.getElementById('paste-modal-close'),
+            pasteInput: document.getElementById('paste-input'),
+            pasteAnalyzeBtn: document.getElementById('paste-analyze-btn'),
+
             // 로딩 & 토스트
             loadingOverlay: document.getElementById('loading-overlay'),
             toast: document.getElementById('toast')
@@ -241,6 +248,14 @@ const App = {
         this.elements.settingsBtn.addEventListener('click', () => this.showScreen('settings'));
         this.elements.searchInput.addEventListener('input', (e) => this.handleSearch(e.target.value));
         this.elements.addBtn.addEventListener('click', () => this.showEditScreen());
+
+        // 붙여넣기 모달
+        this.elements.pasteBtn.addEventListener('click', () => this.showPasteModal());
+        this.elements.pasteModalClose.addEventListener('click', () => this.hidePasteModal());
+        this.elements.pasteModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.pasteModal) this.hidePasteModal();
+        });
+        this.elements.pasteAnalyzeBtn.addEventListener('click', () => this.handlePasteAnalyze());
 
         // 상세 보기 화면
         this.elements.detailBackBtn.addEventListener('click', () => this.showScreen('main'));
@@ -948,6 +963,59 @@ const App = {
         } finally {
             this.showLoading(false);
         }
+    },
+
+    /**
+     * 붙여넣기 모달 표시
+     */
+    showPasteModal() {
+        this.elements.pasteInput.value = '';
+        this.elements.pasteModal.classList.add('show');
+        this.elements.pasteInput.focus();
+    },
+
+    /**
+     * 붙여넣기 모달 닫기
+     */
+    hidePasteModal() {
+        this.elements.pasteModal.classList.remove('show');
+    },
+
+    /**
+     * 붙여넣기 텍스트 분석 후 편집 화면으로 이동
+     */
+    handlePasteAnalyze() {
+        const text = this.elements.pasteInput.value.trim();
+        if (!text) {
+            this.showToast('텍스트를 붙여넣어주세요');
+            return;
+        }
+
+        const parsed = PasteParser.parse(text);
+        this.hidePasteModal();
+
+        // 편집 화면을 새 항목 모드로 열기
+        this.showEditScreen(null);
+
+        // 파싱된 값으로 폼 채우기
+        if (parsed.siteName) this.elements.siteName.value = parsed.siteName;
+        if (parsed.username) this.elements.username.value = parsed.username;
+        if (parsed.password) {
+            this.elements.password.value = parsed.password;
+            this.elements.password.type = 'text'; // 확인할 수 있게 표시
+        }
+        if (parsed.notes) this.elements.notes.value = parsed.notes;
+
+        // 카테고리 설정
+        if (parsed.category) {
+            this.refreshCategoryOptions();
+            const hasOption = Array.from(this.elements.categorySelect.options).some(o => o.value === parsed.category);
+            if (hasOption) {
+                this.elements.categorySelect.value = parsed.category;
+            }
+        }
+
+        this.showToast('자동 분류 완료! 확인 후 저장하세요');
     },
 
     /**
