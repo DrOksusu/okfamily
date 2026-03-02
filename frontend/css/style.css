@@ -244,10 +244,15 @@ input:focus, textarea:focus {
 .password-input-group {
     display: flex;
     gap: 8px;
+    align-items: center;
 }
 
 .password-input-group input {
     flex: 1;
+}
+
+.password-input-group .toggle-password-btn {
+    flex-shrink: 0;
 }
 
 /* 설정 */
@@ -640,4 +645,71 @@ input:focus, textarea:focus {
 
 #detail-screen .btn-danger {
     margin-top: 24px;
+}
+
+/* 카테고리 필터 칩 */
+.category-filter {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.category-filter::-webkit-scrollbar {
+    display: none;
+}
+
+.category-chip {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--gray-200);
+    background: white;
+    font-size: 0.813rem;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.category-chip.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.category-chip:hover:not(.active) {
+    background: var(--gray-100);
+}
+
+/* 카테고리 뱃지 */
+.category-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    margin-bottom: 16px;
+}
+
+/* 목록 항목 내 카테고리 뱃지 */
+.password-item-category {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.688rem;
+    font-weight: 500;
+    background: var(--primary);
+    color: white;
+    opacity: 0.85;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+/* 커스텀 카테고리 입력 */
+.custom-category-input {
+    margin-top: 8px;
 }

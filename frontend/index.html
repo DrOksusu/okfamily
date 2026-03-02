@@ -28,7 +28,10 @@
                         <input type="email" id="login-email" placeholder="이메일" required autocomplete="email">
                     </div>
                     <div class="form-group">
-                        <input type="password" id="login-password" placeholder="비밀번호" required autocomplete="current-password">
+                        <div class="password-input-group">
+                            <input type="password" id="login-password" placeholder="비밀번호" required autocomplete="current-password">
+                            <button type="button" class="icon-btn toggle-password-btn" data-target="login-password">👁️</button>
+                        </div>
                     </div>
                     <button type="submit" class="btn-primary">로그인</button>
                 </form>
@@ -53,10 +56,16 @@
                         <input type="email" id="register-email" placeholder="이메일" required autocomplete="email">
                     </div>
                     <div class="form-group">
-                        <input type="password" id="register-password" placeholder="비밀번호 (6자 이상)" required autocomplete="new-password" minlength="6">
+                        <div class="password-input-group">
+                            <input type="password" id="register-password" placeholder="비밀번호 (6자 이상)" required autocomplete="new-password" minlength="6">
+                            <button type="button" class="icon-btn toggle-password-btn" data-target="register-password">👁️</button>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <input type="password" id="register-password-confirm" placeholder="비밀번호 확인" required autocomplete="new-password">
+                        <div class="password-input-group">
+                            <input type="password" id="register-password-confirm" placeholder="비밀번호 확인" required autocomplete="new-password">
+                            <button type="button" class="icon-btn toggle-password-btn" data-target="register-password-confirm">👁️</button>
+                        </div>
                     </div>
                     <button type="submit" class="btn-primary">가입하기</button>
                 </form>
@@ -71,7 +80,10 @@
                 <div class="lock-icon">🔐</div>
                 <h1>비밀번호 관리</h1>
                 <p id="lock-message">마스터 비밀번호를 입력하세요</p>
-                <input type="password" id="master-password" placeholder="마스터 비밀번호" autocomplete="off">
+                <div class="password-input-group">
+                    <input type="password" id="master-password" placeholder="마스터 비밀번호" autocomplete="off">
+                    <button type="button" class="icon-btn toggle-password-btn" data-target="master-password">👁️</button>
+                </div>
                 <button id="unlock-btn" class="btn-primary">잠금 해제</button>
 
                 <!-- 생체인증 버튼 -->
@@ -101,6 +113,14 @@
                 <input type="text" id="search-input" placeholder="검색...">
             </div>
 
+            <div id="category-filter" class="category-filter">
+                <button class="category-chip active" data-category="all">전체</button>
+                <button class="category-chip" data-category="은행">은행</button>
+                <button class="category-chip" data-category="증권">증권</button>
+                <button class="category-chip" data-category="암호화폐">암호화폐</button>
+                <button class="category-chip" data-category="생활">생활</button>
+            </div>
+
             <ul id="password-list" class="password-list">
                 <!-- 비밀번호 항목들이 여기에 표시됨 -->
             </ul>
@@ -119,6 +139,7 @@
             <div class="detail-container">
                 <div class="detail-icon" id="detail-icon">G</div>
                 <h2 id="detail-site-name" class="detail-site-name">사이트명</h2>
+                <span id="detail-category" class="category-badge" style="display:none;"></span>
 
                 <div class="detail-field">
                     <label>아이디</label>
@@ -155,6 +176,19 @@
             </header>
 
             <form id="password-form">
+                <div class="form-group">
+                    <label for="category-select">카테고리</label>
+                    <select id="category-select">
+                        <option value="">선택 안함</option>
+                        <option value="은행">은행</option>
+                        <option value="증권">증권</option>
+                        <option value="암호화폐">암호화폐</option>
+                        <option value="생활">생활</option>
+                        <option value="__custom__">직접 입력...</option>
+                    </select>
+                    <input type="text" id="custom-category-input" class="custom-category-input" placeholder="새 카테고리 이름" style="display:none;">
+                </div>
+
                 <div class="form-group">
                     <label for="site-name">사이트/앱 이름</label>
                     <input type="text" id="site-name" required>

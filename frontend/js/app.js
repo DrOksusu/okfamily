@@ -10,6 +10,8 @@ const App = {
     autoLockTimeout: null,
     autoLockTime: 300000, // 5분
     vaultMasterHash: null, // 서버에서 가져온 마스터 해시
+    selectedCategoryFilter: 'all', // 카테고리 필터 상태
+    DEFAULT_CATEGORIES: ['은행', '증권', '암호화폐', '생활'],
 
     // DOM 요소
     screens: {},
@@ -95,6 +97,11 @@ const App = {
             }
 
             this.showScreen('lock');
+
+            // 생체인증 활성화 시 자동으로 지문 인증 시도
+            if (Biometric.isEnabled()) {
+                setTimeout(() => this.handleBiometricUnlock(), 300);
+            }
         } catch (error) {
             console.error('인증 확인 오류:', error);
             // 토큰 만료 등의 경우 로그인 화면으로
@@ -185,6 +192,12 @@ const App = {
             togglePassword: document.getElementById('toggle-password'),
             generatePassword: document.getElementById('generate-password'),
 
+            // 카테고리 관련
+            categoryFilter: document.getElementById('category-filter'),
+            categorySelect: document.getElementById('category-select'),
+            customCategoryInput: document.getElementById('custom-category-input'),
+            detailCategory: document.getElementById('detail-category'),
+
             // 설정 화면
             settingsBackBtn: document.getElementById('settings-back-btn'),
             autoLockTime: document.getElementById('auto-lock-time'),
@@ -244,6 +257,43 @@ const App = {
         this.elements.togglePassword.addEventListener('click', () => this.togglePasswordVisibility());
         this.elements.generatePassword.addEventListener('click', () => this.handleGeneratePassword());
 
+        // 인증 화면 비밀번호 토글 버튼들
+        document.querySelectorAll('.toggle-password-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const input = document.getElementById(btn.dataset.target);
+                input.type = input.type === 'password' ? 'text' : 'password';
+            });
+        });
+
+        // 카테고리 관련
+        this.elements.categoryFilter.addEventListener('click', (e) => {
+            const chip = e.target.closest('.category-chip');
+            if (!chip) return;
+            this.selectedCategoryFilter = chip.dataset.category;
+            this.elements.categoryFilter.querySelectorAll('.category-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            this.renderPasswordList(this.elements.searchInput.value);
+        });
+        this.elements.categorySelect.addEventListener('change', (e) => {
+            if (e.target.value === '__custom__') {
+                this.elements.customCategoryInput.style.display = 'block';
+                this.elements.customCategoryInput.focus();
+            } else {
+                this.elements.customCategoryInput.style.display = 'none';
+            }
+        });
+        this.elements.customCategoryInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const name = e.target.value.trim();
+                if (name) {
+                    this.addCustomCategory(name);
+                    e.target.value = '';
+                    e.target.style.display = 'none';
+                }
+            }
+        });
+
         // 설정 화면
         this.elements.settingsBackBtn.addEventListener('click', () => this.showScreen('main'));
         this.elements.autoLockTime.addEventListener('change', (e) => this.handleAutoLockTimeChange(e));
@@ -253,6 +303,9 @@ const App = {
         this.elements.importFile.addEventListener('change', (e) => this.handleImport(e));
         this.elements.changeMasterBtn.addEventListener('click', () => this.handleChangeMaster());
         this.elements.settingsLogoutBtn.addEventListener('click', () => this.handleLogout());
+
+        // 카테고리 select 옵션 초기화
+        this.refreshCategoryOptions();
 
         // 자동 잠금을 위한 활동 감지
         ['click', 'keypress', 'scroll', 'touchstart'].forEach(event => {
@@ -468,9 +521,12 @@ const App = {
         this.elements.unlockBtn.textContent = '잠금 해제';
         this.elements.lockMessage.textContent = '마스터 비밀번호를 입력하세요';
 
-        // 생체인증 버튼 표시 여부
+        // 생체인증 버튼 표시 여부 + 자동 지문 인증
         if (Biometric.isEnabled()) {
             this.elements.biometricBtn.style.display = 'flex';
+            setTimeout(() => this.handleBiometricUnlock(), 300);
+        } else {
+            this.elements.biometricBtn.style.display = 'none';
         }
     },
 
@@ -498,18 +554,27 @@ const App = {
      * 비밀번호 목록 렌더링
      */
     renderPasswordList(filter = '') {
-        const filtered = filter
-            ? this.passwords.filter(p =>
-                p.siteName.toLowerCase().includes(filter.toLowerCase()) ||
-                (p.username && p.username.toLowerCase().includes(filter.toLowerCase()))
-            )
-            : this.passwords;
+        let filtered = this.passwords;
+
+        // 텍스트 검색 필터
+        if (filter) {
+            const q = filter.toLowerCase();
+            filtered = filtered.filter(p =>
+                p.siteName.toLowerCase().includes(q) ||
+                (p.username && p.username.toLowerCase().includes(q))
+            );
+        }
+
+        // 카테고리 필터
+        if (this.selectedCategoryFilter && this.selectedCategoryFilter !== 'all') {
+            filtered = filtered.filter(p => p.category === this.selectedCategoryFilter);
+        }
 
         if (filtered.length === 0) {
             this.elements.passwordList.innerHTML = `
                 <div class="empty-state">
                     <div class="empty-state-icon">🔑</div>
-                    <p>${filter ? '검색 결과가 없습니다' : '저장된 비밀번호가 없습니다'}</p>
+                    <p>${filter || this.selectedCategoryFilter !== 'all' ? '검색 결과가 없습니다' : '저장된 비밀번호가 없습니다'}</p>
                 </div>
             `;
             return;
@@ -519,7 +584,7 @@ const App = {
             <li class="password-item" data-id="${p.id}">
                 <div class="password-item-icon">${p.siteName.charAt(0).toUpperCase()}</div>
                 <div class="password-item-info">
-                    <div class="password-item-name">${this.escapeHtml(p.siteName)}</div>
+                    <div class="password-item-name">${this.escapeHtml(p.siteName)}${p.category ? `<span class="password-item-category">${this.escapeHtml(p.category)}</span>` : ''}</div>
                     <div class="password-item-username">${this.escapeHtml(p.username || '(아이디 없음)')}</div>
                 </div>
             </li>
@@ -555,6 +620,14 @@ const App = {
         this.elements.detailPassword.textContent = '••••••••';
         this.elements.detailPassword.classList.add('password-hidden');
         this.detailPasswordVisible = false;
+
+        // 카테고리 표시
+        if (password.category) {
+            this.elements.detailCategory.textContent = password.category;
+            this.elements.detailCategory.style.display = 'inline-block';
+        } else {
+            this.elements.detailCategory.style.display = 'none';
+        }
 
         // 메모 표시
         if (password.notes) {
@@ -635,11 +708,18 @@ const App = {
             this.elements.username.value = password.username || '';
             this.elements.password.value = password.password;
             this.elements.notes.value = password.notes || '';
+            // 카테고리 설정
+            this.refreshCategoryOptions();
+            const hasOption = Array.from(this.elements.categorySelect.options).some(o => o.value === password.category);
+            this.elements.categorySelect.value = hasOption ? (password.category || '') : '';
+            this.elements.customCategoryInput.style.display = 'none';
         } else {
             // 추가 모드
             this.elements.editTitle.textContent = '새 비밀번호';
             this.elements.deleteBtn.style.display = 'none';
             this.elements.passwordForm.reset();
+            this.refreshCategoryOptions();
+            this.elements.customCategoryInput.style.display = 'none';
         }
 
         this.elements.password.type = 'password';
@@ -652,12 +732,20 @@ const App = {
     async handleSave(e) {
         e.preventDefault();
 
+        // 카테고리 값 결정
+        let category = this.elements.categorySelect.value;
+        if (category === '__custom__') {
+            category = this.elements.customCategoryInput.value.trim();
+            if (category) this.addCustomCategory(category);
+        }
+
         const data = {
             id: this.currentEditId || Date.now().toString(),
             siteName: this.elements.siteName.value.trim(),
             username: this.elements.username.value.trim(),
             password: this.elements.password.value,
             notes: this.elements.notes.value.trim(),
+            category: category || undefined,
             updatedAt: Date.now()
         };
 
@@ -917,6 +1005,65 @@ const App = {
             clearTimeout(this.autoLockTimeout);
             this.autoLockTimeout = null;
         }
+    },
+
+    /**
+     * 사용자 추가 카테고리 목록 가져오기
+     */
+    getCustomCategories() {
+        try {
+            return JSON.parse(localStorage.getItem('custom_categories') || '[]');
+        } catch {
+            return [];
+        }
+    },
+
+    /**
+     * 카테고리 추가
+     */
+    addCustomCategory(name) {
+        const customs = this.getCustomCategories();
+        if (!customs.includes(name) && !this.DEFAULT_CATEGORIES.includes(name)) {
+            customs.push(name);
+            localStorage.setItem('custom_categories', JSON.stringify(customs));
+            this.refreshCategoryOptions();
+            this.refreshCategoryFilterChips();
+        }
+        this.elements.categorySelect.value = name;
+    },
+
+    /**
+     * 카테고리 select 옵션 갱신
+     */
+    refreshCategoryOptions() {
+        const select = this.elements.categorySelect;
+        const current = select.value;
+        // 기존 옵션 초기화
+        select.innerHTML = '<option value="">선택 안함</option>';
+        // 기본 카테고리
+        this.DEFAULT_CATEGORIES.forEach(c => {
+            select.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        // 사용자 카테고리
+        this.getCustomCategories().forEach(c => {
+            select.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        select.innerHTML += '<option value="__custom__">직접 입력...</option>';
+        // 이전 값 복원
+        if (current) select.value = current;
+    },
+
+    /**
+     * 카테고리 필터 칩 갱신
+     */
+    refreshCategoryFilterChips() {
+        const container = this.elements.categoryFilter;
+        container.innerHTML = '<button class="category-chip active" data-category="all">전체</button>';
+        const all = [...this.DEFAULT_CATEGORIES, ...this.getCustomCategories()];
+        all.forEach(c => {
+            container.innerHTML += `<button class="category-chip" data-category="${this.escapeHtml(c)}">${this.escapeHtml(c)}</button>`;
+        });
+        this.selectedCategoryFilter = 'all';
     },
 
     /**
