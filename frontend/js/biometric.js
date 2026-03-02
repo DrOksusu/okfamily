@@ -7,6 +7,7 @@ const Biometric = {
     // 저장 키
     CREDENTIAL_KEY: 'biometric_enabled',
     MASTER_KEY: 'encrypted_master',
+    LOGIN_CREDENTIALS_KEY: 'encrypted_login_credentials',
 
     /**
      * 생체인증 지원 여부 확인
@@ -34,9 +35,9 @@ const Biometric = {
     },
 
     /**
-     * 생체인증 등록 (마스터 비밀번호 저장)
+     * 생체인증 등록 (마스터 비밀번호 + 로그인 자격증명 저장)
      */
-    async register(masterPassword) {
+    async register(masterPassword, email, password) {
         if (!await this.isSupported()) {
             throw new Error('이 기기에서 생체인증을 지원하지 않습니다.');
         }
@@ -49,6 +50,11 @@ const Biometric = {
             const encryptedMaster = await this.encryptMaster(masterPassword);
             localStorage.setItem(this.MASTER_KEY, encryptedMaster);
             localStorage.setItem(this.CREDENTIAL_KEY, 'true');
+
+            // 로그인 자격증명도 함께 저장
+            if (email && password) {
+                await this.saveLoginCredentials(email, password);
+            }
 
             return true;
         } catch (error) {
@@ -252,11 +258,45 @@ const Biometric = {
     },
 
     /**
+     * 로그인 자격증명 암호화 저장
+     */
+    async saveLoginCredentials(email, password) {
+        const json = JSON.stringify({ email, password });
+        const encrypted = await this.encryptMaster(json);
+        localStorage.setItem(this.LOGIN_CREDENTIALS_KEY, encrypted);
+    },
+
+    /**
+     * 로그인 자격증명 복호화 반환
+     */
+    async getLoginCredentials() {
+        const encrypted = localStorage.getItem(this.LOGIN_CREDENTIALS_KEY);
+        if (!encrypted) return null;
+        const json = await this.decryptMaster(encrypted);
+        return JSON.parse(json);
+    },
+
+    /**
+     * 로그인 자격증명 존재 여부
+     */
+    hasLoginCredentials() {
+        return !!localStorage.getItem(this.LOGIN_CREDENTIALS_KEY);
+    },
+
+    /**
+     * 자동 로그인 가능 여부 (생체인증 ON + 자격증명 저장됨)
+     */
+    canAutoLogin() {
+        return this.isEnabled() && this.hasLoginCredentials();
+    },
+
+    /**
      * 생체인증 비활성화
      */
     disable() {
         localStorage.removeItem(this.CREDENTIAL_KEY);
         localStorage.removeItem(this.MASTER_KEY);
+        localStorage.removeItem(this.LOGIN_CREDENTIALS_KEY);
         localStorage.removeItem('credential_id');
     },
 

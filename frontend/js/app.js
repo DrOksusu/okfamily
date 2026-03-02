@@ -12,6 +12,9 @@ const App = {
     vaultMasterHash: null, // 서버에서 가져온 마스터 해시
     selectedCategoryFilter: 'all', // 카테고리 필터 상태
     DEFAULT_CATEGORIES: ['은행', '증권', '암호화폐', '생활'],
+    loginEmail: null, // 현재 세션의 로그인 이메일 (메모리에만 보관)
+    loginPassword: null, // 현재 세션의 로그인 비밀번호 (메모리에만 보관)
+    _checkingAuth: false, // checkAuth 진행 중 플래그
 
     // DOM 요소
     screens: {},
@@ -68,8 +71,17 @@ const App = {
      * 인증 상태 확인
      */
     async checkAuth() {
+        this._checkingAuth = true;
+
+        // 토큰 없음: 자동 로그인 가능하면 lock-screen → 지문, 아니면 로그인 화면
         if (!API.isLoggedIn()) {
-            this.showScreen('login');
+            if (Biometric.canAutoLogin()) {
+                this.showLockScreenForAutoLogin();
+                setTimeout(() => this.handleBiometricAutoLogin(), 300);
+            } else {
+                this.showScreen('login');
+            }
+            this._checkingAuth = false;
             return;
         }
 
@@ -104,11 +116,17 @@ const App = {
             }
         } catch (error) {
             console.error('인증 확인 오류:', error);
-            // 토큰 만료 등의 경우 로그인 화면으로
+            // 토큰 만료 등: 자동 로그인 가능하면 지문 시도
             API.removeToken();
-            this.showScreen('login');
+            if (Biometric.canAutoLogin()) {
+                this.showLockScreenForAutoLogin();
+                setTimeout(() => this.handleBiometricAutoLogin(), 300);
+            } else {
+                this.showScreen('login');
+            }
         } finally {
             this.showLoading(false);
+            this._checkingAuth = false;
         }
     },
 
@@ -329,8 +347,20 @@ const App = {
 
         // 인증 만료 이벤트 수신
         window.addEventListener('auth:logout', () => {
-            this.showToast('세션이 만료되었습니다. 다시 로그인하세요.');
-            this.handleLogout();
+            // checkAuth 진행 중이면 중복 처리 방지
+            if (this._checkingAuth) return;
+
+            if (Biometric.canAutoLogin()) {
+                this.masterPassword = null;
+                this.passwords = [];
+                this.vaultMasterHash = null;
+                this.clearAutoLock();
+                this.showLockScreenForAutoLogin();
+                setTimeout(() => this.handleBiometricAutoLogin(), 300);
+            } else {
+                this.showToast('세션이 만료되었습니다. 다시 로그인하세요.');
+                this.handleLogout();
+            }
         });
     },
 
@@ -351,6 +381,9 @@ const App = {
         try {
             this.showLoading(true);
             await API.login(email, password);
+            // 자격증명 메모리 보관 (생체인증 등록 시 사용)
+            this.loginEmail = email;
+            this.loginPassword = password;
             this.elements.loginForm.reset();
             await this.checkAuth();
         } catch (error) {
@@ -388,6 +421,9 @@ const App = {
         try {
             this.showLoading(true);
             await API.register(email, password);
+            // 자격증명 메모리 보관 (생체인증 등록 시 사용)
+            this.loginEmail = email;
+            this.loginPassword = password;
             this.elements.registerForm.reset();
             this.showToast('회원가입이 완료되었습니다');
             await this.checkAuth();
@@ -405,7 +441,10 @@ const App = {
         this.masterPassword = null;
         this.passwords = [];
         this.vaultMasterHash = null;
+        this.loginEmail = null;
+        this.loginPassword = null;
         this.clearAutoLock();
+        this.restoreLockScreenToNormal();
         API.logout();
         this.showScreen('login');
     },
@@ -464,6 +503,105 @@ const App = {
     },
 
     /**
+     * 자동 로그인용 lock-screen 표시 (마스터 비밀번호 입력필드 숨김)
+     */
+    showLockScreenForAutoLogin() {
+        this.elements.lockMessage.textContent = '지문으로 로그인하세요';
+        this.elements.masterPassword.style.display = 'none';
+        this.elements.unlockBtn.style.display = 'none';
+        this.elements.biometricBtn.style.display = 'flex';
+        this.elements.resetBtn.style.display = 'none';
+        this.showScreen('lock');
+    },
+
+    /**
+     * lock-screen을 일반 상태로 복원 (지문 취소/실패 시)
+     */
+    restoreLockScreenToNormal() {
+        this.elements.masterPassword.style.display = '';
+        this.elements.unlockBtn.style.display = '';
+        this.elements.biometricBtn.style.display = Biometric.isEnabled() ? 'flex' : 'none';
+        this.elements.resetBtn.style.display = '';
+        this.elements.lockMessage.textContent = '마스터 비밀번호를 입력하세요';
+    },
+
+    /**
+     * 생체인증 자동 로그인 (토큰 만료 시 지문으로 재로그인 + 잠금 해제)
+     */
+    async handleBiometricAutoLogin() {
+        try {
+            this.showLoading(true);
+
+            // 1. 지문 인증 → 마스터 비밀번호 복호화
+            const masterPw = await Biometric.authenticate();
+
+            // 2. 로그인 자격증명 복호화
+            const credentials = await Biometric.getLoginCredentials();
+            if (!credentials) {
+                throw new Error('저장된 로그인 정보가 없습니다.');
+            }
+
+            // 3. 서버 로그인 (새 JWT 발급)
+            await API.login(credentials.email, credentials.password);
+            this.loginEmail = credentials.email;
+            this.loginPassword = credentials.password;
+
+            // 4. Vault 가져와서 마스터 비밀번호 검증
+            const vault = await API.getVault();
+            this.vaultMasterHash = vault.masterHash;
+
+            const isValid = await Crypto.verifyPassword(masterPw, this.vaultMasterHash);
+            if (!isValid) {
+                this.showToast('마스터 비밀번호가 변경되었습니다. 수동으로 입력하세요.');
+                this.restoreLockScreenToNormal();
+                return;
+            }
+
+            // 5. 성공: 메인 화면 진입
+            this.masterPassword = masterPw;
+            await this.loadPasswords();
+            this.showScreen('main');
+            this.renderPasswordList();
+            this.resetAutoLock();
+        } catch (error) {
+            console.error('자동 로그인 오류:', error);
+
+            // 로그인 실패 (비밀번호 변경 등) → 자격증명 삭제 후 로그인 화면
+            if (error.message && (error.message.includes('이메일') || error.message.includes('비밀번호') || error.message.includes('인증'))) {
+                localStorage.removeItem(Biometric.LOGIN_CREDENTIALS_KEY);
+                API.removeToken();
+                this.showToast('계정 정보가 변경되었습니다. 다시 로그인하세요.');
+                this.showScreen('login');
+                return;
+            }
+
+            // 지문 취소 → lock-screen 복원 (수동 입력 가능)
+            if (error.message && error.message.includes('취소')) {
+                this.restoreLockScreenToNormal();
+                // 토큰 없으면 로그인 화면 대신 lock-screen에 로그아웃 버튼 유지
+                if (!API.isLoggedIn()) {
+                    this.elements.lockMessage.textContent = '지문 인증이 취소되었습니다';
+                    this.elements.masterPassword.style.display = 'none';
+                    this.elements.unlockBtn.style.display = 'none';
+                    this.elements.resetBtn.style.display = 'none';
+                }
+                return;
+            }
+
+            // 기타 오류 (네트워크 등)
+            this.showToast(error.message || '자동 로그인 실패');
+            this.restoreLockScreenToNormal();
+            if (!API.isLoggedIn()) {
+                this.elements.masterPassword.style.display = 'none';
+                this.elements.unlockBtn.style.display = 'none';
+                this.elements.resetBtn.style.display = 'none';
+            }
+        } finally {
+            this.showLoading(false);
+        }
+    },
+
+    /**
      * 생체인증으로 잠금 해제
      */
     async handleBiometricUnlock() {
@@ -511,8 +649,27 @@ const App = {
                 return;
             }
 
+            // 로그인 자격증명 확인 (메모리에 없으면 입력 요청)
+            let email = this.loginEmail;
+            let password = this.loginPassword;
+
+            if (!email || !password) {
+                email = prompt('자동 로그인을 위해 계정 이메일을 입력하세요:');
+                if (!email) {
+                    e.target.checked = false;
+                    return;
+                }
+                password = prompt('계정 비밀번호를 입력하세요:');
+                if (!password) {
+                    e.target.checked = false;
+                    return;
+                }
+            }
+
             try {
-                await Biometric.register(this.masterPassword);
+                await Biometric.register(this.masterPassword, email, password);
+                this.loginEmail = email;
+                this.loginPassword = password;
                 this.showToast('지문 인증이 활성화되었습니다');
             } catch (error) {
                 this.showToast(error.message);
