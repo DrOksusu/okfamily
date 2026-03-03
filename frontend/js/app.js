@@ -234,6 +234,13 @@ const App = {
             pasteInput: document.getElementById('paste-input'),
             pasteAnalyzeBtn: document.getElementById('paste-analyze-btn'),
 
+            // 자격증명 입력 모달
+            credentialModal: document.getElementById('credential-modal'),
+            credentialModalClose: document.getElementById('credential-modal-close'),
+            credentialEmail: document.getElementById('credential-email'),
+            credentialPassword: document.getElementById('credential-password'),
+            credentialConfirmBtn: document.getElementById('credential-confirm-btn'),
+
             // 로딩 & 토스트
             loadingOverlay: document.getElementById('loading-overlay'),
             toast: document.getElementById('toast')
@@ -274,6 +281,12 @@ const App = {
             if (e.target === this.elements.pasteModal) this.hidePasteModal();
         });
         this.elements.pasteAnalyzeBtn.addEventListener('click', () => this.handlePasteAnalyze());
+
+        // 자격증명 입력 모달
+        this.elements.credentialModalClose.addEventListener('click', () => this.hideCredentialModal());
+        this.elements.credentialModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.credentialModal) this.hideCredentialModal();
+        });
 
         // 상세 보기 화면
         this.elements.detailBackBtn.addEventListener('click', () => this.showScreen('main'));
@@ -381,11 +394,14 @@ const App = {
         try {
             this.showLoading(true);
             await API.login(email, password);
-            // 자격증명 메모리 보관 (생체인증 등록 시 사용)
+            // 생체인증 등록 전까지만 일시 보관, checkAuth 후 즉시 제거
             this.loginEmail = email;
             this.loginPassword = password;
             this.elements.loginForm.reset();
             await this.checkAuth();
+            // 생체인증 등록 완료 후 평문 자격증명 제거
+            this.loginEmail = null;
+            this.loginPassword = null;
         } catch (error) {
             this.showToast(error.message);
         } finally {
@@ -421,12 +437,15 @@ const App = {
         try {
             this.showLoading(true);
             await API.register(email, password);
-            // 자격증명 메모리 보관 (생체인증 등록 시 사용)
+            // 생체인증 등록 전까지만 일시 보관, checkAuth 후 즉시 제거
             this.loginEmail = email;
             this.loginPassword = password;
             this.elements.registerForm.reset();
             this.showToast('회원가입이 완료되었습니다');
             await this.checkAuth();
+            // 생체인증 등록 완료 후 평문 자격증명 제거
+            this.loginEmail = null;
+            this.loginPassword = null;
         } catch (error) {
             this.showToast(error.message);
         } finally {
@@ -543,8 +562,6 @@ const App = {
 
             // 3. 서버 로그인 (새 JWT 발급)
             await API.login(credentials.email, credentials.password);
-            this.loginEmail = credentials.email;
-            this.loginPassword = credentials.password;
 
             // 4. Vault 가져와서 마스터 비밀번호 검증
             const vault = await API.getVault();
@@ -566,8 +583,8 @@ const App = {
         } catch (error) {
             console.error('자동 로그인 오류:', error);
 
-            // 로그인 실패 (비밀번호 변경 등) → 자격증명 삭제 후 로그인 화면
-            if (error.message && (error.message.includes('이메일') || error.message.includes('비밀번호') || error.message.includes('인증'))) {
+            // 로그인 실패 (401/403: 자격증명 오류) → 자격증명 삭제 후 로그인 화면
+            if (error.status === 401 || error.status === 403) {
                 localStorage.removeItem(Biometric.LOGIN_CREDENTIALS_KEY);
                 API.removeToken();
                 this.showToast('계정 정보가 변경되었습니다. 다시 로그인하세요.');
@@ -575,26 +592,23 @@ const App = {
                 return;
             }
 
-            // 지문 취소 → lock-screen 복원 (수동 입력 가능)
+            // 지문 취소 → 토큰 있으면 lock-screen 복원, 없으면 로그인 화면
             if (error.message && error.message.includes('취소')) {
-                this.restoreLockScreenToNormal();
-                // 토큰 없으면 로그인 화면 대신 lock-screen에 로그아웃 버튼 유지
-                if (!API.isLoggedIn()) {
-                    this.elements.lockMessage.textContent = '지문 인증이 취소되었습니다';
-                    this.elements.masterPassword.style.display = 'none';
-                    this.elements.unlockBtn.style.display = 'none';
-                    this.elements.resetBtn.style.display = 'none';
+                if (API.isLoggedIn()) {
+                    this.restoreLockScreenToNormal();
+                } else {
+                    this.showScreen('login');
+                    this.showToast('지문 인증이 취소되었습니다. 로그인하세요.');
                 }
                 return;
             }
 
-            // 기타 오류 (네트워크 등)
+            // 기타 오류 (네트워크 등) → 토큰 있으면 lock-screen, 없으면 로그인 화면
             this.showToast(error.message || '자동 로그인 실패');
-            this.restoreLockScreenToNormal();
-            if (!API.isLoggedIn()) {
-                this.elements.masterPassword.style.display = 'none';
-                this.elements.unlockBtn.style.display = 'none';
-                this.elements.resetBtn.style.display = 'none';
+            if (API.isLoggedIn()) {
+                this.restoreLockScreenToNormal();
+            } else {
+                this.showScreen('login');
             }
         } finally {
             this.showLoading(false);
@@ -649,36 +663,77 @@ const App = {
                 return;
             }
 
-            // 로그인 자격증명 확인 (메모리에 없으면 입력 요청)
-            let email = this.loginEmail;
-            let password = this.loginPassword;
+            // 로그인 자격증명 확인 (메모리에 없으면 모달로 입력 요청)
+            const email = this.loginEmail;
+            const password = this.loginPassword;
 
             if (!email || !password) {
-                email = prompt('자동 로그인을 위해 계정 이메일을 입력하세요:');
-                if (!email) {
-                    e.target.checked = false;
-                    return;
-                }
-                password = prompt('계정 비밀번호를 입력하세요:');
-                if (!password) {
-                    e.target.checked = false;
-                    return;
-                }
+                this.showCredentialModal(e.target);
+                return;
             }
 
-            try {
-                await Biometric.register(this.masterPassword, email, password);
-                this.loginEmail = email;
-                this.loginPassword = password;
-                this.showToast('지문 인증이 활성화되었습니다');
-            } catch (error) {
-                this.showToast(error.message);
-                e.target.checked = false;
-            }
+            await this.registerBiometric(email, password, e.target);
         } else {
             // 생체인증 비활성화
             Biometric.disable();
             this.showToast('지문 인증이 비활성화되었습니다');
+        }
+    },
+
+    /**
+     * 생체인증 등록 실행
+     */
+    async registerBiometric(email, password, toggleElement) {
+        try {
+            await Biometric.register(this.masterPassword, email, password);
+            // 생체인증 등록 완료 → 평문 자격증명 즉시 제거
+            this.loginEmail = null;
+            this.loginPassword = null;
+            this.showToast('지문 인증이 활성화되었습니다');
+        } catch (error) {
+            this.showToast(error.message);
+            if (toggleElement) toggleElement.checked = false;
+        }
+    },
+
+    /**
+     * 자격증명 입력 모달 열기
+     */
+    showCredentialModal(toggleElement) {
+        this._credentialToggle = toggleElement;
+        this.elements.credentialEmail.value = '';
+        this.elements.credentialPassword.value = '';
+        this.elements.credentialModal.classList.add('show');
+        this.elements.credentialEmail.focus();
+
+        // 기존 리스너 제거 후 새로 등록 (중복 방지)
+        const confirmBtn = this.elements.credentialConfirmBtn;
+        const newBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        this.elements.credentialConfirmBtn = newBtn;
+
+        newBtn.addEventListener('click', async () => {
+            const email = this.elements.credentialEmail.value.trim();
+            const password = this.elements.credentialPassword.value;
+
+            if (!email || !password) {
+                this.showToast('이메일과 비밀번호를 모두 입력하세요');
+                return;
+            }
+
+            this.hideCredentialModal();
+            await this.registerBiometric(email, password, this._credentialToggle);
+        });
+    },
+
+    /**
+     * 자격증명 입력 모달 닫기
+     */
+    hideCredentialModal() {
+        this.elements.credentialModal.classList.remove('show');
+        // 모달 닫기 시 토글 복원 (등록 안 된 경우)
+        if (this._credentialToggle && !Biometric.isEnabled()) {
+            this._credentialToggle.checked = false;
         }
     },
 

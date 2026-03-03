@@ -275,6 +275,26 @@
         </div>
     </div>
 
+    <!-- 자격증명 입력 모달 (생체인증 등록 시) -->
+    <div id="credential-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>자동 로그인 설정</h2>
+                <button id="credential-modal-close" class="icon-btn">✕</button>
+            </div>
+            <p class="modal-desc">생체인증 자동 로그인을 위해 계정 정보를 입력하세요.</p>
+            <div class="form-group">
+                <label for="credential-email">이메일</label>
+                <input type="email" id="credential-email" class="form-input" placeholder="이메일 입력">
+            </div>
+            <div class="form-group">
+                <label for="credential-password">비밀번호</label>
+                <input type="password" id="credential-password" class="form-input" placeholder="비밀번호 입력">
+            </div>
+            <button id="credential-confirm-btn" class="btn-primary">확인</button>
+        </div>
+    </div>
+
     <!-- 토스트 메시지 -->
     <div id="toast" class="toast"></div>
 

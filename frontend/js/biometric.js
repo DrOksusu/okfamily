@@ -302,10 +302,13 @@ const Biometric = {
 
     /**
      * 저장된 마스터 비밀번호 업데이트
+     * 기존 로그인 자격증명은 유지하고, 마스터 비밀번호만 재암호화
      */
     async updateMaster(newPassword) {
-        if (this.isEnabled()) {
-            await this.register(newPassword);
-        }
+        if (!this.isEnabled()) return;
+
+        // 마스터 비밀번호만 재암호화 (로그인 자격증명은 그대로 유지)
+        const encryptedMaster = await this.encryptMaster(newPassword);
+        localStorage.setItem(this.MASTER_KEY, encryptedMaster);
     }
 };

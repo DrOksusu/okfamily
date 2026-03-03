@@ -69,7 +69,9 @@ const API = {
                     this.removeToken();
                     window.dispatchEvent(new CustomEvent('auth:logout'));
                 }
-                throw new Error(data.error || '요청 처리 중 오류가 발생했습니다.');
+                const err = new Error(data.error || '요청 처리 중 오류가 발생했습니다.');
+                err.status = response.status;
+                throw err;
             }
 
             return data;
