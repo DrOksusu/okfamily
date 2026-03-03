@@ -234,6 +234,12 @@ const App = {
             pasteInput: document.getElementById('paste-input'),
             pasteAnalyzeBtn: document.getElementById('paste-analyze-btn'),
 
+            // 생체인증 제안 모달
+            biometricSuggestModal: document.getElementById('biometric-suggest-modal'),
+            biometricSuggestClose: document.getElementById('biometric-suggest-close'),
+            biometricSuggestYes: document.getElementById('biometric-suggest-yes'),
+            biometricSuggestNo: document.getElementById('biometric-suggest-no'),
+
             // 자격증명 입력 모달
             credentialModal: document.getElementById('credential-modal'),
             credentialModalClose: document.getElementById('credential-modal-close'),
@@ -281,6 +287,14 @@ const App = {
             if (e.target === this.elements.pasteModal) this.hidePasteModal();
         });
         this.elements.pasteAnalyzeBtn.addEventListener('click', () => this.handlePasteAnalyze());
+
+        // 생체인증 제안 모달
+        this.elements.biometricSuggestClose.addEventListener('click', () => this.dismissBiometricSuggest());
+        this.elements.biometricSuggestNo.addEventListener('click', () => this.dismissBiometricSuggest());
+        this.elements.biometricSuggestYes.addEventListener('click', () => this.acceptBiometricSuggest());
+        this.elements.biometricSuggestModal.addEventListener('click', (e) => {
+            if (e.target === this.elements.biometricSuggestModal) this.dismissBiometricSuggest();
+        });
 
         // 자격증명 입력 모달
         this.elements.credentialModalClose.addEventListener('click', () => this.hideCredentialModal());
@@ -513,6 +527,9 @@ const App = {
             this.showScreen('main');
             this.renderPasswordList();
             this.resetAutoLock();
+
+            // 생체인증 미등록 시 제안
+            setTimeout(() => this.suggestBiometric(), 500);
         } catch (error) {
             console.error('잠금 해제 오류:', error);
             this.showToast('오류: ' + error.message);
@@ -735,6 +752,45 @@ const App = {
         if (this._credentialToggle && !Biometric.isEnabled()) {
             this._credentialToggle.checked = false;
         }
+    },
+
+    /**
+     * 생체인증 제안 (지원되지만 미등록 + 거절 안 한 경우)
+     */
+    async suggestBiometric() {
+        const supported = await Biometric.isSupported();
+        const enabled = Biometric.isEnabled();
+        const dismissed = localStorage.getItem('biometric_suggest_dismissed') === 'true';
+
+        if (supported && !enabled && !dismissed) {
+            this.elements.biometricSuggestModal.classList.add('show');
+        }
+    },
+
+    /**
+     * 생체인증 제안 수락
+     */
+    async acceptBiometricSuggest() {
+        this.elements.biometricSuggestModal.classList.remove('show');
+
+        const email = this.loginEmail;
+        const password = this.loginPassword;
+
+        if (email && password) {
+            await this.registerBiometric(email, password, this.elements.biometricToggle);
+            this.elements.biometricToggle.checked = Biometric.isEnabled();
+        } else {
+            // 자격증명 없으면 모달로 입력 요청
+            this.showCredentialModal(this.elements.biometricToggle);
+        }
+    },
+
+    /**
+     * 생체인증 제안 거절 ("다음에")
+     */
+    dismissBiometricSuggest() {
+        this.elements.biometricSuggestModal.classList.remove('show');
+        localStorage.setItem('biometric_suggest_dismissed', 'true');
     },
 
     /**

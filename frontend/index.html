@@ -275,6 +275,21 @@
         </div>
     </div>
 
+    <!-- 생체인증 제안 모달 (첫 로그인 시) -->
+    <div id="biometric-suggest-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>지문 인증 활성화</h2>
+                <button id="biometric-suggest-close" class="icon-btn">✕</button>
+            </div>
+            <p class="modal-desc">다음부터 지문으로 바로 로그인할 수 있습니다. 활성화할까요?</p>
+            <div style="display: flex; gap: 10px;">
+                <button id="biometric-suggest-yes" class="btn-primary" style="flex: 1;">활성화</button>
+                <button id="biometric-suggest-no" class="btn-secondary" style="flex: 1;">다음에</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 자격증명 입력 모달 (생체인증 등록 시) -->
     <div id="credential-modal" class="modal-overlay">
         <div class="modal-content">
