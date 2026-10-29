@@ -32,3 +32,6 @@ test/screenshots/
 
 # bkit PDCA 문서 (로컬 전용)
 docs/
+
+# Playwright MCP 실행 기록
+.playwright-mcp/
