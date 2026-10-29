@@ -21,7 +21,9 @@ app.use(helmet());
 
 // CORS configuration
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5500',
+    origin: process.env.FRONTEND_URL
+        ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+        : 'http://localhost:5500',
     credentials: true
 }));
 
