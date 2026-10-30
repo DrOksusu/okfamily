@@ -476,6 +476,7 @@ const App = {
         this.vaultMasterHash = null;
         this.loginEmail = null;
         this.loginPassword = null;
+        Biometric.clearSession();
         this.clearAutoLock();
         this.restoreLockScreenToNormal();
         API.logout();
@@ -597,6 +598,7 @@ const App = {
             this.showScreen('main');
             this.renderPasswordList();
             this.resetAutoLock();
+            this.notifyBiometricReset();
         } catch (error) {
             console.error('자동 로그인 오류:', error);
 
@@ -658,12 +660,23 @@ const App = {
             this.showScreen('main');
             this.renderPasswordList();
             this.resetAutoLock();
+            this.notifyBiometricReset();
         } catch (error) {
             console.error('생체인증 오류:', error);
             this.showToast(error.message || '생체인증 실패');
         } finally {
             this.showLoading(false);
         }
+    },
+
+    /**
+     * 생체인증 보안 업데이트(키 전환) 실패로 해제된 경우 재설정 안내
+     */
+    notifyBiometricReset() {
+        if (Biometric.isEnabled()) return;
+        this.elements.biometricToggle.checked = false;
+        this.elements.biometricBtn.style.display = 'none';
+        this.showToast('보안 업데이트로 지문 인증이 꺼졌습니다. 설정에서 다시 켜 주세요.');
     },
 
     /**
@@ -799,6 +812,7 @@ const App = {
     lock() {
         this.masterPassword = null;
         this.passwords = [];
+        Biometric.clearSession();
         this.clearAutoLock();
         this.showScreen('lock');
         this.elements.unlockBtn.textContent = '잠금 해제';

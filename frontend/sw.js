@@ -1,11 +1,13 @@
-const CACHE_NAME = 'password-manager-v1';
+const CACHE_NAME = 'password-manager-v2';
 const ASSETS = [
     './',
     './index.html',
     './css/style.css',
     './js/app.js',
     './js/crypto.js',
-    './js/db.js',
+    './js/api.js',
+    './js/biometric.js',
+    './js/paste-parser.js',
     './manifest.json'
 ];
 
