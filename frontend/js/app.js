@@ -554,6 +554,7 @@ const App = {
      * lock-screen을 일반 상태로 복원 (지문 취소/실패 시)
      */
     restoreLockScreenToNormal() {
+        Biometric.clearSession();
         this.elements.masterPassword.style.display = '';
         this.elements.unlockBtn.style.display = '';
         this.elements.biometricBtn.style.display = Biometric.isEnabled() ? 'flex' : 'none';
@@ -597,6 +598,7 @@ const App = {
             this.showScreen('main');
             this.renderPasswordList();
             this.resetAutoLock();
+            this.notifyBiometricReset();
         } catch (error) {
             console.error('자동 로그인 오류:', error);
 
@@ -658,12 +660,24 @@ const App = {
             this.showScreen('main');
             this.renderPasswordList();
             this.resetAutoLock();
+            this.notifyBiometricReset();
         } catch (error) {
             console.error('생체인증 오류:', error);
+            Biometric.clearSession();
             this.showToast(error.message || '생체인증 실패');
         } finally {
             this.showLoading(false);
         }
+    },
+
+    /**
+     * 생체인증 보안 업데이트(키 전환) 실패로 해제된 경우 재설정 안내
+     */
+    notifyBiometricReset() {
+        if (Biometric.isEnabled()) return;
+        this.elements.biometricToggle.checked = false;
+        this.elements.biometricBtn.style.display = 'none';
+        this.showToast('보안 업데이트로 지문 인증이 꺼졌습니다. 설정에서 다시 켜 주세요.');
     },
 
     /**
@@ -1196,9 +1210,17 @@ const App = {
             this.vaultMasterHash = hash;
             this.masterPassword = newPassword;
 
-            // 생체인증이 활성화된 경우 업데이트
+            // 생체인증이 활성화된 경우 업데이트 (서버 변경은 이미 완료 — 실패해도 변경 자체는 성공으로 안내)
             if (Biometric.isEnabled()) {
-                await Biometric.updateMaster(newPassword);
+                try {
+                    await Biometric.updateMaster(newPassword);
+                } catch (error) {
+                    console.error('생체인증 마스터 업데이트 실패:', error);
+                    Biometric.disable();
+                    this.elements.biometricToggle.checked = false;
+                    this.showToast('마스터 비밀번호가 변경되었습니다. 지문 인증은 설정에서 다시 켜 주세요.');
+                    return;
+                }
             }
 
             this.showToast('마스터 비밀번호가 변경되었습니다');
@@ -1295,6 +1317,11 @@ const App = {
             screen.style.display = 'none';
         });
         this.screens[name].classList.add('active');
+
+        // 로그인·잠금 화면에서는 생체인증 세션 키를 메모리에 두지 않음
+        if (name === 'login' || name === 'lock') {
+            Biometric.clearSession();
+        }
 
         // 화면별 display 스타일
         if (['login', 'register', 'lock'].includes(name)) {
