@@ -220,6 +220,62 @@ async function testLegacyMigrationFailure(browser, baseUrl) {
     await context.close();
 }
 
+async function testLegacyMigrationCancelled(browser, baseUrl) {
+    const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
+    await seedLegacyData(page);
+
+    // 재등록 지문 프롬프트를 사용자가 취소 → 구 데이터 유지, 다음 해제 때 재시도
+    const master = await page.evaluate(async () => {
+        Biometric.createCredential = async () => {
+            const error = new Error('cancelled');
+            error.name = 'NotAllowedError';
+            throw error;
+        };
+        return Biometric.authenticate();
+    });
+    logResult(results, '전환취소', '잠금 해제는 성공', MASTER, master, master === MASTER);
+
+    const state = await storageState(page);
+    logResult(results, '전환취소', '구 데이터 유지(재시도 대상)', 'true', String(state.hasDeviceKey), state.hasDeviceKey === true);
+    logResult(results, '전환취소', '생체인증 유지', 'true', String(state.enabled), state.enabled === true);
+    await context.close();
+}
+
+async function testRegisterFailureLeavesNoState(browser, baseUrl) {
+    const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
+
+    // 키 유도 이후 단계에서 실패 → 저장소에 반쪽 상태가 남지 않아야 함
+    const leftovers = await page.evaluate(async ([m, e, p]) => {
+        Biometric.encryptWithKey = async () => { throw new Error('encrypt failed'); };
+        await Biometric.register(m, e, p).catch(() => {});
+        return ['biometric_enabled', 'encrypted_master', 'credential_id', 'biometric_scheme']
+            .filter(k => localStorage.getItem(k) !== null);
+    }, [MASTER, EMAIL, LOGIN_PW]);
+    logResult(results, '등록실패', '저장소에 반쪽 상태 없음', '[]', JSON.stringify(leftovers), leftovers.length === 0);
+    await context.close();
+}
+
+async function testStableUserHandle(browser, baseUrl) {
+    const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
+
+    // 재등록 시 같은 user.id를 써야 기기에 패스키가 쌓이지 않음
+    const ids = await page.evaluate(async ([m, e, p]) => {
+        const seen = [];
+        const originalCreate = navigator.credentials.create.bind(navigator.credentials);
+        navigator.credentials.create = (options) => {
+            seen.push(btoa(String.fromCharCode(...new Uint8Array(options.publicKey.user.id))));
+            return originalCreate(options);
+        };
+        await Biometric.register(m, e, p);
+        Biometric.disable();
+        await Biometric.register(m, e, p);
+        return seen;
+    }, [MASTER, EMAIL, LOGIN_PW]);
+    const same = ids.length === 2 && ids[0] === ids[1];
+    logResult(results, '패스키', '재등록 시 user.id 유지', 'same', same ? 'same' : JSON.stringify(ids), same);
+    await context.close();
+}
+
 async function testDisable(browser, baseUrl) {
     const { context, page } = await openPage(browser, baseUrl, { hasPrf: false });
     await page.evaluate(([m, e, p]) => Biometric.register(m, e, p), [MASTER, EMAIL, LOGIN_PW]);
@@ -266,7 +322,11 @@ async function main() {
     const browser = await chromium.launch({ headless: true })
         .catch(() => chromium.launch({ headless: true, channel: 'chrome' }));
 
-    const tests = [testPrf, testIdbFallback, testLegacyMigration, testLegacyMigrationFailure, testDisable, testServiceWorkerCache];
+    const tests = [
+        testPrf, testIdbFallback, testLegacyMigration, testLegacyMigrationFailure,
+        testLegacyMigrationCancelled, testRegisterFailureLeavesNoState, testStableUserHandle,
+        testDisable, testServiceWorkerCache
+    ];
     for (const test of tests) {
         try {
             await test(browser, baseUrl);

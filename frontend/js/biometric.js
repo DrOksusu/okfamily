@@ -4,7 +4,8 @@
  *
  * 키 보관 방식 (biometric_scheme)
  * - 'prf': WebAuthn PRF 확장으로 인증기에서 키를 유도. 키는 어디에도 저장하지 않음 (지문 없이는 복호화 불가)
- * - 'idb': PRF 미지원 기기. non-extractable AES 키를 IndexedDB에 보관 (키 원본 탈취 불가)
+ * - 'idb': PRF 미지원 기기. non-extractable AES 키를 IndexedDB에 보관
+ *          (키 원본을 꺼내 갈 수는 없지만, 같은 origin 스크립트는 지문 없이 복호화 가능 — 지문은 UI 게이트)
  * - 구 형식: localStorage 'device_key'에 키 원본 저장 → 다음 잠금 해제 시 위 방식으로 전환
  */
 
@@ -15,6 +16,7 @@ const Biometric = {
     LOGIN_CREDENTIALS_KEY: 'encrypted_login_credentials',
     SCHEME_KEY: 'biometric_scheme',
     LEGACY_KEY: 'device_key',
+    USER_HANDLE_KEY: 'biometric_user_id',
 
     // PRF 입력값과 HKDF info (변경 시 기존 등록 기기의 키가 달라져 복호화 불가)
     PRF_SALT: new TextEncoder().encode('okfamily-biometric-prf-v1'),
@@ -72,50 +74,68 @@ const Biometric = {
 
         try {
             // 먼저 생체인증으로 본인 확인 (지문 등록) + PRF 출력 획득
-            const prfOutput = await this.createCredential(email);
+            const { credentialId, prfOutput } = await this.createCredential(email);
 
             // PRF 지원 시 인증기에서 키 유도, 미지원 시 IndexedDB 키 생성
-            let key;
-            if (prfOutput) {
-                key = await this.deriveKeyFromPrf(prfOutput);
-                await this.deleteStoredKey();
-                localStorage.setItem(this.SCHEME_KEY, 'prf');
-            } else {
-                key = await this.createStoredKey();
-                localStorage.setItem(this.SCHEME_KEY, 'idb');
-            }
-            this._sessionKey = key;
+            const key = prfOutput
+                ? await this.deriveKeyFromPrf(prfOutput)
+                : await this.createStoredKey();
 
-            // 마스터 비밀번호 암호화 저장
-            localStorage.setItem(this.MASTER_KEY, await this.encryptWithKey(key, masterPassword));
+            // 암호문을 모두 먼저 계산 (저장 도중 실패해 반쪽 상태가 남지 않도록)
+            const encryptedMaster = await this.encryptWithKey(key, masterPassword);
+            const encryptedCredentials = email && password
+                ? await this.encryptWithKey(key, JSON.stringify({ email, password }))
+                : null;
 
-            // 로그인 자격증명도 함께 저장 (없으면 이전 키로 암호화된 값 제거)
-            if (email && password) {
-                const json = JSON.stringify({ email, password });
-                localStorage.setItem(this.LOGIN_CREDENTIALS_KEY, await this.encryptWithKey(key, json));
+            // 저장은 await 없이 한 번에 (중간에 탭이 닫혀도 구/신 데이터가 섞이지 않음)
+            localStorage.setItem('credential_id', credentialId);
+            localStorage.setItem(this.SCHEME_KEY, prfOutput ? 'prf' : 'idb');
+            localStorage.setItem(this.MASTER_KEY, encryptedMaster);
+            if (encryptedCredentials) {
+                localStorage.setItem(this.LOGIN_CREDENTIALS_KEY, encryptedCredentials);
             } else {
                 localStorage.removeItem(this.LOGIN_CREDENTIALS_KEY);
             }
-
             localStorage.removeItem(this.LEGACY_KEY);
             localStorage.setItem(this.CREDENTIAL_KEY, 'true');
+            this._sessionKey = key;
+
+            // PRF 방식이면 이전에 쓰던 IndexedDB 키 정리 (실패해도 등록은 유효)
+            if (prfOutput) {
+                this.deleteStoredKey().catch(error => console.error('생체인증 키 삭제 실패:', error));
+            }
             return true;
         } catch (error) {
             console.error('생체인증 등록 실패:', error);
             if (error.name === 'NotAllowedError') {
-                throw new Error('생체인증이 취소되었습니다.');
+                const cancelled = new Error('생체인증이 취소되었습니다.');
+                cancelled.cancelled = true;
+                throw cancelled;
             }
             throw new Error('생체인증 등록에 실패했습니다.');
         }
     },
 
     /**
+     * WebAuthn user.id (재등록 시 같은 값을 써야 기기에 패스키가 쌓이지 않음)
+     */
+    getUserHandle() {
+        const stored = localStorage.getItem(this.USER_HANDLE_KEY);
+        if (stored) {
+            return new Uint8Array(atob(stored).split('').map(c => c.charCodeAt(0)));
+        }
+        const userId = crypto.getRandomValues(new Uint8Array(16));
+        localStorage.setItem(this.USER_HANDLE_KEY, btoa(String.fromCharCode(...userId)));
+        return userId;
+    },
+
+    /**
      * 생체인증 Credential 생성 (지문 등록)
-     * @returns {Promise<ArrayBuffer|null>} PRF 출력 (미지원 시 null)
+     * @returns {Promise<{credentialId: string, prfOutput: ArrayBuffer|null}>} PRF 출력은 미지원 시 null
      */
     async createCredential(email) {
         const challenge = crypto.getRandomValues(new Uint8Array(32));
-        const userId = crypto.getRandomValues(new Uint8Array(16));
+        const userId = this.getUserHandle();
 
         const createOptions = {
             publicKey: {
@@ -149,29 +169,27 @@ const Biometric = {
         // 지문/Face ID 등록 요청
         const credential = await navigator.credentials.create(createOptions);
 
-        // Credential ID 저장 (나중에 인증 시 사용)
+        // Credential ID (저장은 register에서 다른 값과 함께 한 번에)
         const credentialId = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
-        localStorage.setItem('credential_id', credentialId);
 
         // 등록 시점에 PRF 결과를 주는 플랫폼도 있고, 인증(get) 때만 주는 플랫폼도 있음
         const prf = credential.getClientExtensionResults().prf;
+        let prfOutput = null;
         if (prf && prf.results && prf.results.first) {
-            return prf.results.first;
+            prfOutput = prf.results.first;
+        } else if (prf && prf.enabled) {
+            prfOutput = await this.getAssertion(true, credentialId);
         }
-        if (prf && prf.enabled) {
-            return this.getAssertion(true);
-        }
-        return null;
+        return { credentialId, prfOutput };
     },
 
     /**
      * 생체인증 요청 (지문/Face ID)
      * @param {boolean} withPrf - PRF 출력 요청 여부
+     * @param {string} [credentialIdBase64] - 대상 credential ID (기본: 저장된 값)
      * @returns {Promise<ArrayBuffer|null>} PRF 출력 (요청하지 않았거나 없으면 null)
      */
-    async getAssertion(withPrf) {
-        // 저장된 credential ID 가져오기
-        const credentialIdBase64 = localStorage.getItem('credential_id');
+    async getAssertion(withPrf, credentialIdBase64 = localStorage.getItem('credential_id')) {
         const allowCredentials = credentialIdBase64 ? [{
             type: 'public-key',
             id: new Uint8Array(atob(credentialIdBase64).split('').map(c => c.charCodeAt(0))),
@@ -286,7 +304,8 @@ const Biometric = {
 
     /**
      * 구 형식 데이터를 새 방식으로 재등록 (지문 1회 추가)
-     * 실패 시 구 데이터를 삭제하고 생체인증을 해제 (마스터 비밀번호로는 항상 해제 가능)
+     * - 사용자가 취소: 구 데이터 유지, 다음 잠금 해제 때 재시도
+     * - 그 외 실패: 구 데이터를 삭제하고 생체인증 해제 (마스터 비밀번호로는 항상 해제 가능)
      */
     async migrateLegacy(masterPassword, legacyKey) {
         const key = legacyKey || await this.loadLegacyKey();
@@ -303,7 +322,9 @@ const Biometric = {
             );
         } catch (error) {
             console.error('생체인증 보안 업데이트 실패:', error);
-            this.disable();
+            if (!error.cancelled) {
+                this.disable();
+            }
             this._pendingCredentials = credentials;
         }
     },
