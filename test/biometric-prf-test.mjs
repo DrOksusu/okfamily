@@ -241,6 +241,50 @@ async function testLegacyMigrationCancelled(browser, baseUrl) {
     await context.close();
 }
 
+async function testLegacyUpdateMasterCancelled(browser, baseUrl) {
+    const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
+    await seedLegacyData(page);
+
+    // 구 형식 상태에서 마스터 변경 중 전환 취소 → 다음 해제 시 새 마스터가 나와야 함
+    const unlocked = await page.evaluate(async () => {
+        const originalCreate = Biometric.createCredential;
+        Biometric.createCredential = async () => {
+            const error = new Error('cancelled');
+            error.name = 'NotAllowedError';
+            throw error;
+        };
+        await Biometric.updateMaster('New-Master-9999');
+        Biometric.createCredential = originalCreate;
+        Biometric.clearSession();
+        return Biometric.authenticate();
+    });
+    logResult(results, '구형마스터변경', '취소 후에도 새 마스터 복원', 'New-Master-9999', unlocked, unlocked === 'New-Master-9999');
+    await context.close();
+}
+
+async function testLegacyCancelLimit(browser, baseUrl) {
+    const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
+    await seedLegacyData(page);
+
+    // 전환을 계속 취소하면 3회째에 구 데이터 삭제 (평문 키가 영구히 남지 않도록)
+    const states = await page.evaluate(async () => {
+        Biometric.createCredential = async () => {
+            const error = new Error('cancelled');
+            error.name = 'NotAllowedError';
+            throw error;
+        };
+        const seen = [];
+        for (let i = 0; i < 3; i++) {
+            await Biometric.authenticate();
+            seen.push(localStorage.getItem('device_key') !== null);
+        }
+        return seen;
+    });
+    const ok = JSON.stringify(states) === JSON.stringify([true, true, false]);
+    logResult(results, '취소상한', '3회째 취소 시 구 키 삭제', '[true,true,false]', JSON.stringify(states), ok);
+    await context.close();
+}
+
 async function testRegisterFailureLeavesNoState(browser, baseUrl) {
     const { context, page } = await openPage(browser, baseUrl, { hasPrf: true });
 
@@ -324,7 +368,8 @@ async function main() {
 
     const tests = [
         testPrf, testIdbFallback, testLegacyMigration, testLegacyMigrationFailure,
-        testLegacyMigrationCancelled, testRegisterFailureLeavesNoState, testStableUserHandle,
+        testLegacyMigrationCancelled, testLegacyUpdateMasterCancelled, testLegacyCancelLimit,
+        testRegisterFailureLeavesNoState, testStableUserHandle,
         testDisable, testServiceWorkerCache
     ];
     for (const test of tests) {

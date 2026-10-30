@@ -17,6 +17,9 @@ const Biometric = {
     SCHEME_KEY: 'biometric_scheme',
     LEGACY_KEY: 'device_key',
     USER_HANDLE_KEY: 'biometric_user_id',
+    MIGRATE_CANCEL_KEY: 'biometric_migrate_cancels',
+    // 구 형식 전환을 이 횟수만큼 취소하면 구 데이터 삭제 (평문 키가 영구히 남지 않도록)
+    MAX_MIGRATE_CANCELS: 3,
 
     // PRF 입력값과 HKDF info (변경 시 기존 등록 기기의 키가 달라져 복호화 불가)
     PRF_SALT: new TextEncoder().encode('okfamily-biometric-prf-v1'),
@@ -97,6 +100,7 @@ const Biometric = {
                 localStorage.removeItem(this.LOGIN_CREDENTIALS_KEY);
             }
             localStorage.removeItem(this.LEGACY_KEY);
+            localStorage.removeItem(this.MIGRATE_CANCEL_KEY);
             localStorage.setItem(this.CREDENTIAL_KEY, 'true');
             this._sessionKey = key;
 
@@ -304,7 +308,7 @@ const Biometric = {
 
     /**
      * 구 형식 데이터를 새 방식으로 재등록 (지문 1회 추가)
-     * - 사용자가 취소: 구 데이터 유지, 다음 잠금 해제 때 재시도
+     * - 사용자가 취소: 구 데이터 유지, 다음 잠금 해제 때 재시도 (MAX_MIGRATE_CANCELS회째에는 삭제)
      * - 그 외 실패: 구 데이터를 삭제하고 생체인증 해제 (마스터 비밀번호로는 항상 해제 가능)
      */
     async migrateLegacy(masterPassword, legacyKey) {
@@ -322,7 +326,10 @@ const Biometric = {
             );
         } catch (error) {
             console.error('생체인증 보안 업데이트 실패:', error);
-            if (!error.cancelled) {
+            const cancels = Number(localStorage.getItem(this.MIGRATE_CANCEL_KEY) || 0) + 1;
+            if (error.cancelled && cancels < this.MAX_MIGRATE_CANCELS) {
+                localStorage.setItem(this.MIGRATE_CANCEL_KEY, String(cancels));
+            } else {
                 this.disable();
             }
             this._pendingCredentials = credentials;
@@ -497,6 +504,7 @@ const Biometric = {
         localStorage.removeItem('credential_id');
         localStorage.removeItem(this.LEGACY_KEY);
         localStorage.removeItem(this.SCHEME_KEY);
+        localStorage.removeItem(this.MIGRATE_CANCEL_KEY);
         this.clearSession();
         this.deleteStoredKey().catch(error => console.error('생체인증 키 삭제 실패:', error));
     },
@@ -508,9 +516,11 @@ const Biometric = {
     async updateMaster(newPassword) {
         if (!this.isEnabled()) return;
 
-        // 구 형식이면 이 기회에 새 방식으로 전환
+        // 구 형식이면 새 마스터를 구 키로 먼저 저장(전환 취소 대비) 후 새 방식으로 전환
         if (this.isLegacy()) {
-            await this.migrateLegacy(newPassword);
+            const legacyKey = await this.loadLegacyKey();
+            localStorage.setItem(this.MASTER_KEY, await this.encryptWithKey(legacyKey, newPassword));
+            await this.migrateLegacy(newPassword, legacyKey);
             return;
         }
 
